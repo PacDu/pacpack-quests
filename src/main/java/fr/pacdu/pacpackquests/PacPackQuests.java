@@ -102,7 +102,7 @@ public class PacPackQuests implements ModInitializer {
 			});
 		});
 
-		// The sound effect plays every time a block is broken
+		// The event is listened every time a block is broken
 		PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
 			if (!world.isClient()) {
 				// We retrieve our save manager

@@ -18,17 +18,17 @@ import net.minecraft.util.Identifier;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.*;
 import java.util.stream.Stream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.HashMap;
-import java.util.Map;
 
 public class QuestManager {
 
     // Central storage for all loaded quests
     public static final Map<String, QuestDefinition> LOADED_QUESTS = new HashMap<>();
     private static final Gson GSON = new Gson();
+    private static final List<String> QUEST_DEFINITION_REQUIDED_LIST = Arrays.asList("title", "type", "target", "requiredAmount", "icon", "reward", "rewardAmount");
 
     public static void registerLoader() {
         SynchronousResourceReloader questReloader = manager -> {
@@ -46,7 +46,7 @@ public class QuestManager {
                         String fullPath = fileId.getPath();
                         String questId = fullPath.substring(fullPath.lastIndexOf('/') + 1, fullPath.length() - 5);
 
-                        parseAndAddQuest(questId, json);
+                        AssertParseAndAddQuest(questId, json);
                     } catch (Exception e) {
                         PacPackQuests.LOGGER.error("[PacPackQuests] Failed to load Datapack quest: {}", fileId, e);
                     }
@@ -74,7 +74,7 @@ public class QuestManager {
                                     String questId = fileName.substring(0, fileName.length() - 5);
 
                                     // Config quests will overwrite datapack quests if the ID is identical
-                                    parseAndAddQuest(questId, json);
+                                    AssertParseAndAddQuest(questId, json);
                                 } catch (Exception e) {
                                     PacPackQuests.LOGGER.error("Failed to load Config quest: {}", path.getFileName(), e);
                                 }
@@ -93,16 +93,45 @@ public class QuestManager {
         );
     }
 
-    private static void parseAndAddQuest(String questId, JsonObject json) {
+    private static void AssertParseAndAddQuest(String questId, JsonObject json) {
+        StringBuilder errorMessage = new StringBuilder();
+
+        for (String e : QUEST_DEFINITION_REQUIDED_LIST) {
+            if (!json.has(e)) {
+                errorMessage.append("WARN : Variable \"").append(e).append("\" is missing in the quest ").append(questId).append(".");
+                PacPackQuests.LOGGER.warn(errorMessage.toString());
+                return;
+            }
+        }
+
         String title = json.get("title").getAsString();
+        if (title.isEmpty()) errorMessage.append(" The title cannot be empty,");
+
         String category = json.has("category") ? json.get("category").getAsString() : "main";
-        TaskType type = TaskType.valueOf(json.get("type").getAsString());
+
+        TaskType type = TaskType.isValid(json.get("type").getAsString()) ? TaskType.valueOf(json.get("type").getAsString()) : null;
+        if (type == null) errorMessage.append(" The type \"").append(json.get("type")).append("\" does not exist,");
+
         String target = json.get("target").getAsString();
+        if (Identifier.tryParse(target) == null && Identifier.tryParse(target.substring(1)) == null) errorMessage.append(" The target ").append(json.get("target")).append(" is not a valid target,");
+
         int requiredAmount = json.get("requiredAmount").getAsInt();
+        if (requiredAmount <= 0) errorMessage.append(" The required amount must be greater than 0,");
 
         Item iconItem = Registries.ITEM.get(Identifier.of(json.get("icon").getAsString()));
+        if (Objects.equals(iconItem.toString(), "minecraft:air")) errorMessage.append(" The icon ").append(json.get("icon")).append(" does not exist,");
+
         Item rewardItem = Registries.ITEM.get(Identifier.of(json.get("reward").getAsString()));
+        if (Objects.equals(rewardItem.toString(), "minecraft:air")) errorMessage.append(" The reward ").append(json.get("reward")).append(" does not exist,");
+
         int rewardAmount = json.get("rewardAmount").getAsInt();
+        if (rewardAmount <= 0) errorMessage.append(" The reward amount must be greater than 0,");
+
+        if (!errorMessage.isEmpty()) {
+            errorMessage.deleteCharAt(0).deleteCharAt(errorMessage.length() - 1).insert(0, "WARN : There are errors in the json file of quest \"" + questId + "\" : ");
+            PacPackQuests.LOGGER.warn(errorMessage.toString());
+            return;
+        }
 
         QuestDefinition quest = new QuestDefinition(
                 questId, title, category, type, target, requiredAmount,
