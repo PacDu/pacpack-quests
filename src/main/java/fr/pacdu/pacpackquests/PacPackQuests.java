@@ -1,5 +1,6 @@
 package fr.pacdu.pacpackquests;
 
+import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestProgressHandler;
 import fr.pacdu.pacpackquests.data.QuestState;
@@ -15,20 +16,27 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.Block;
 import net.minecraft.entity.EntityType;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.UUID;
 
 public class PacPackQuests implements ModInitializer {
 
+	public static final String MOD_ID = "pacpackquests";
+	// Initialize the SLF4J Logger with your Mod ID
+	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
 	@Override
 	public void onInitialize() {
+		LOGGER.info("Initializing PacPack Quests...");
+		ModConfig.load();
 		QuestManager.registerLoader();
 
 		// S2C (Server to Client) : The server synchronizes the list of quests with the client
