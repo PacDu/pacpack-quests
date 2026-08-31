@@ -10,7 +10,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
-import org.lwjgl.glfw.GLFW;
+import net.minecraft.util.Formatting;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,15 +18,15 @@ import java.util.List;
 public class QuestScreen extends Screen {
 
 	private int windowWidth, windowHeight, startX, startY;
-	private final List<QuestNode> QuestList = new ArrayList<>();
+	private final List<QuestNode> questList = new ArrayList<>();
 
-	// Tab system variables
 	private final List<String> categories = new ArrayList<>();
+	private static String selectedCategory = "main";
 	private final int tabWidth = 70;
 	private final int tabHeight = 20;
-	private static String selectedCategory = "main";
 
-	record QuestNode(String id, String title, int x, int y, ItemStack icon) {}
+	// Streamlined record for minimal node UI
+	record QuestNode(String id, String title, int x, int y, ItemStack icon, ItemStack reward, int rewardAmount) {}
 
 	public QuestScreen() {
 		super(Text.translatable("gui.pacpack-quests.title"));
@@ -41,13 +41,11 @@ public class QuestScreen extends Screen {
 	protected void init() {
 		super.init();
 
-		// Shift main window right to leave space for tabs on the left
 		windowWidth = this.width - 140;
 		windowHeight = this.height - 80;
 		startX = (this.width - windowWidth) / 2 + 40;
 		startY = (this.height - windowHeight) / 2 - 10;
 
-		// Close button
 		int buttonWidth = 100;
 		int buttonHeight = 20;
 		this.addDrawableChild(
@@ -63,12 +61,16 @@ public class QuestScreen extends Screen {
 				categories.add(quest.category());
 			}
 		}
+
+		// Force "main" category to always be at the top
 		if (categories.contains("main")) {
 			categories.remove("main");
-			categories.addFirst("main"); // L'insère tout en haut
+			categories.addFirst("main");
 		} else if (categories.isEmpty()) {
 			categories.add("main");
 		}
+
+		// Fallback if the previously selected category was deleted/no longer exists
 		if (!categories.contains(selectedCategory)) {
 			selectedCategory = categories.getFirst();
 		}
@@ -76,14 +78,25 @@ public class QuestScreen extends Screen {
 		refreshQuests();
 	}
 
-	// Separated from init() so switching tabs doesn't rebuild the entire screen
 	private void refreshQuests() {
-		QuestList.clear();
+		questList.clear();
 		int offsetX = 0;
+		int offsetY = 0;
+		int maxPerRow = 6; // Grid layout configuration to prevent overflowing horizontally
+		int spacing = 36;
+
+		int index = 0;
 		for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
 			if (quest.category().equals(selectedCategory)) {
-				QuestList.add(new QuestNode(quest.id(), quest.title(), startX + 30 + offsetX, startY + 40, quest.icon()));
-				offsetX += 50;
+
+				int x = startX + 30 + (index % maxPerRow) * spacing;
+				int y = startY + 40 + (index / maxPerRow) * spacing;
+
+				questList.add(new QuestNode(
+						quest.id(), quest.title(), x, y,
+						quest.icon(), quest.reward(), quest.rewardAmount()
+				));
+				index++;
 			}
 		}
 	}
@@ -92,11 +105,11 @@ public class QuestScreen extends Screen {
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
 
-		// Background and title
+		// Draw main background and window title
 		context.fill(startX, startY, startX + windowWidth, startY + windowHeight, 0xAA000000);
 		context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, startY + 10, -1);
 
-		// Draw Tabs
+		// Draw Left Navigation Tabs
 		int currentTabY = startY + 20;
 		for (String category : categories) {
 			boolean isSelected = category.equals(selectedCategory);
@@ -109,41 +122,67 @@ public class QuestScreen extends Screen {
 			currentTabY += tabHeight + 5;
 		}
 
-		// Draw quest nodes
-		for (QuestNode quest : QuestList) {
-			context.fill(quest.x() - 4, quest.y() - 4, quest.x() + 20, quest.y() + 20, 0xFF444444);
-			context.drawItem(quest.icon(), quest.x(), quest.y());
-
+		// Draw minimal quest nodes
+		for (QuestNode quest : questList) {
 			int current = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
 			int requiredAmount = PacPackQuestsClient.CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
 			boolean claimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
-			String progressText;
-			int color;
-
+			// Determine border/background color based on quest state
+			int bgColor = 0xFF333333; // Default dark grey
 			if (claimed) {
-				progressText = "Claimed!";
-				color = 0xFF55FF55;
-			} else {
-				progressText = current + " / " + requiredAmount;
-				color = current >= requiredAmount ? 0xFFFFFF55 : 0xFFFF5555;
+				bgColor = 0xFF225522; // Muted green for completed/claimed
+			} else if (current >= requiredAmount) {
+				bgColor = 0xFF555522; // Muted gold/yellow if ready to claim
 			}
 
-			context.drawText(this.textRenderer, Text.literal(progressText), quest.x() - 10, quest.y() + 25, color, true);
+			// Draw clean 24x24 slot background box
+			context.fill(quest.x() - 4, quest.y() - 4, quest.x() + 20, quest.y() + 20, bgColor);
 
+			// Draw objective icon
+			context.drawItem(quest.icon(), quest.x(), quest.y());
+
+			// Render mini progress label underneath the node slot
+			String progressText;
+			int textColor;
+			if (claimed) {
+				progressText = "Done";
+				textColor = 0xFF55FF55;
+			} else {
+				progressText = current + "/" + requiredAmount;
+				textColor = current >= requiredAmount ? 0xFFFFFF55 : 0xFFAAAAAA;
+			}
+
+			context.drawText(this.textRenderer, Text.literal(progressText), quest.x() - 2, quest.y() + 22, textColor, true);
+
+			// Render rich tooltip on mouse hover
 			if (isHovering(quest, mouseX, mouseY)) {
-				context.drawTooltip(this.textRenderer, Text.literal(quest.title()), mouseX, mouseY);
+				List<Text> tooltip = new ArrayList<>();
+				tooltip.add(Text.literal(quest.title()).formatted(Formatting.GOLD, Formatting.BOLD));
+
+				if (claimed) {
+					tooltip.add(Text.literal("Status: Completed").formatted(Formatting.GREEN));
+				} else if (current >= requiredAmount) {
+					tooltip.add(Text.literal("Status: Ready to Claim!").formatted(Formatting.YELLOW));
+				} else {
+					tooltip.add(Text.literal("Progress: " + current + " / " + requiredAmount).formatted(Formatting.GRAY));
+				}
+
+				// Append reward description cleanly inside the tooltip
+				tooltip.add(Text.literal("Reward: " + quest.rewardAmount() + "x ").append(quest.reward().getName()).formatted(claimed ? Formatting.GREEN : Formatting.AQUA));
+
+				context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
 			}
 		}
 	}
 
 	@Override
 	public boolean mouseClicked(Click click, boolean doubled) {
-		if (click.button() == 0) { // Clic gauche
+		if (click.button() == 0) { // Left click
 			double mouseX = click.x();
 			double mouseY = click.y();
 
-			// 1. Vérifier si un onglet a été cliqué
+			// Check tab selection clicks
 			int currentTabY = startY + 20;
 			for (String category : categories) {
 				int tabX = startX - tabWidth;
@@ -155,13 +194,14 @@ public class QuestScreen extends Screen {
 				currentTabY += tabHeight + 5;
 			}
 
-			// 2. Vérifier si une quête a été cliquée
-			for (QuestNode quest : QuestList) {
+			// Check quest node clicks to claim rewards
+			for (QuestNode quest : questList) {
 				if (isHovering(quest, (int) mouseX, (int) mouseY)) {
 					int currentProg = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+					int requiredAmount = PacPackQuestsClient.CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
 					boolean isClaimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
-					if (currentProg >= 1 && !isClaimed) {
+					if (currentProg >= requiredAmount && !isClaimed) {
 						ClientPlayNetworking.send(new ClaimQuestPayload(quest.id()));
 					}
 					return true;
@@ -173,16 +213,14 @@ public class QuestScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyInput input) {
-		// Check if the pressed key matches our custom keybinding
 		if (PacPackQuestsClient.openQuestMenuKey.matchesKey(input)) {
-			this.close(); // Close the screen
-			return true;  // Tell the game we handled this input
+			this.close();
+			return true;
 		}
-
-		// Fallback to default behavior (allows closing with the ESC key)
 		return super.keyPressed(input);
 	}
 
+	// Precise hitbox matching the 24x24 icon slot
 	private boolean isHovering(QuestNode quest, int mouseX, int mouseY) {
 		return mouseX >= quest.x() - 4 && mouseX <= quest.x() + 20 &&
 				mouseY >= quest.y() - 4 && mouseY <= quest.y() + 20;

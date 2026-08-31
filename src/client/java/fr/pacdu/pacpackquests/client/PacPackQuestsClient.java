@@ -10,6 +10,9 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
@@ -46,10 +49,13 @@ public class PacPackQuestsClient implements ClientModInitializer {
 
 		ClientPlayNetworking.registerGlobalReceiver(QuestSyncPayload.ID, (payload, context) -> {
 			context.client().execute(() -> {
-				net.minecraft.item.Item item = net.minecraft.registry.Registries.ITEM.get(Identifier.of(payload.iconId()));
+				Item icon = Registries.ITEM.get(Identifier.of(payload.iconId()));
+				Item reward = Registries.ITEM.get(Identifier.of(payload.rewardId()));
+
+				// Reconstruct the quest definition with the newly received reward data
 				QuestDefinition def = new QuestDefinition(
-						payload.questId(), payload.title(), payload.category(), TaskType.MINE_BLOCK, "",
-						payload.requiredAmount(), new net.minecraft.item.ItemStack(item), net.minecraft.item.ItemStack.EMPTY, 0
+						payload.questId(), payload.title(), payload.category(), null, "",
+						payload.requiredAmount(), new ItemStack(icon), new ItemStack(reward), payload.rewardAmount()
 				);
 				CLIENT_DEFINITIONS.put(payload.questId(), def);
 			});

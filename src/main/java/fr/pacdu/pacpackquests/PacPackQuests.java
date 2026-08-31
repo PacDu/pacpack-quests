@@ -59,8 +59,13 @@ public class PacPackQuests implements ModInitializer {
 
 				// Sync definition
 				ServerPlayNetworking.send(player, new QuestSyncPayload(
-						quest.id(), quest.title(), quest.category(), quest.requiredAmount(),
-						Registries.ITEM.getId(quest.icon().getItem()).toString()
+						quest.id(),
+						quest.title(),
+						quest.category(),
+						quest.requiredAmount(),
+						Registries.ITEM.getId(quest.icon().getItem()).toString(),
+						Registries.ITEM.getId(quest.reward().getItem()).toString(),
+						quest.rewardAmount()
 				));
 
 				// Sync progress
