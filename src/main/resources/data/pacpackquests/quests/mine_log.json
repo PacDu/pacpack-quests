@@ -1,0 +1,9 @@
+{
+  "title": "Mine 3 Logs",
+  "type": "MINE_BLOCK",
+  "target": "#minecraft:logs",
+  "requiredAmount": 3,
+  "icon": "minecraft:oak_log",
+  "reward": "minecraft:bread",
+  "rewardAmount": 16
+}

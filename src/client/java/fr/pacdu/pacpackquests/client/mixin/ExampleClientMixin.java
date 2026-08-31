@@ -1,4 +1,4 @@
-package fr.pacdu.pacpackquest.client.mixin;
+package fr.pacdu.pacpackquests.client.mixin;
 
 import net.minecraft.client.MinecraftClient;
 import org.spongepowered.asm.mixin.Mixin;

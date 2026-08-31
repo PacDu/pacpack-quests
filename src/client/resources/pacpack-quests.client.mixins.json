@@ -1,6 +1,6 @@
 {
 	"required": true,
-	"package": "fr.pacdu.pacpackquest.client.mixin",
+	"package": "fr.pacdu.pacpackquests.client.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ExampleClientMixin"

@@ -1,4 +1,4 @@
-# PacPack Quest
+# PacPack Quests
 
 ## Setup
 

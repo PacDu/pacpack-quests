@@ -1,0 +1,9 @@
+{
+  "title": "Kill 3 sheeps",
+  "type": "KILL_MOB",
+  "target": "minecraft:sheep",
+  "requiredAmount": 3,
+  "icon": "minecraft:white_wool",
+  "reward": "minecraft:coal",
+  "rewardAmount": 8
+}

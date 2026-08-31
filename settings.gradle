@@ -10,4 +10,4 @@ pluginManagement {
 }
 
 // Should match your modid
-rootProject.name = 'pacpack-quest'
+rootProject.name = 'pacpack-quests'

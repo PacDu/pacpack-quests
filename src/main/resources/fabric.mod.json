@@ -1,6 +1,6 @@
 {
 	"schemaVersion": 1,
-	"id": "pacpack-quest",
+	"id": "pacpack-quests",
 	"version": "${version}",
 	"name": "PacPack Quest",
 	"description": "This is an example description! Tell everyone what your mod is about!",
@@ -12,23 +12,23 @@
 		"sources": "https://github.com/FabricMC/fabric-example-mod"
 	},
 	"license": "CC0-1.0",
-	"icon": "assets/pacpack-quest/icon.png",
+	"icon": "assets/pacpack-quests/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"fr.pacdu.pacpackquest.PacPackQuest"
+			"fr.pacdu.pacpackquests.PacPackQuests"
 		],
 		"client": [
-			"fr.pacdu.pacpackquest.client.PacPackQuestClient"
+			"fr.pacdu.pacpackquests.client.PacPackQuestsClient"
 		],
 		"fabric-datagen": [
-			"fr.pacdu.pacpackquest.client.PacPackQuestDataGenerator"
+			"fr.pacdu.pacpackquests.client.PacPackQuestsDataGenerator"
 		]
 	},
 	"mixins": [
-		"pacpack-quest.mixins.json",
+		"pacpack-quests.mixins.json",
 		{
-			"config": "pacpack-quest.client.mixins.json",
+			"config": "pacpack-quests.client.mixins.json",
 			"environment": "client"
 		}
 	],

@@ -1,9 +1,9 @@
 {
 	"required": true,
-	"package": "fr.pacdu.pacpackquest.mixin",
+	"package": "fr.pacdu.pacpackquests.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-		"ExampleMixin"
+		"CraftingResultSlotMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
