@@ -95,6 +95,7 @@ public class QuestManager {
 
     private static void parseAndAddQuest(String questId, JsonObject json) {
         String title = json.get("title").getAsString();
+        String category = json.has("category") ? json.get("category").getAsString() : "main";
         TaskType type = TaskType.valueOf(json.get("type").getAsString());
         String target = json.get("target").getAsString();
         int requiredAmount = json.get("requiredAmount").getAsInt();
@@ -104,7 +105,7 @@ public class QuestManager {
         int rewardAmount = json.get("rewardAmount").getAsInt();
 
         QuestDefinition quest = new QuestDefinition(
-                questId, title, type, target, requiredAmount,
+                questId, title, category, type, target, requiredAmount,
                 new ItemStack(iconItem), new ItemStack(rewardItem), rewardAmount
         );
 

@@ -1,5 +1,5 @@
 {
-  "title": "Mine 3 Logs",
+  "title": "Break a tree",
   "type": "MINE_BLOCK",
   "target": "#minecraft:logs",
   "requiredAmount": 3,

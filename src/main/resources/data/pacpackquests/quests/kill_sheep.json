@@ -1,5 +1,5 @@
 {
-  "title": "Kill 3 sheeps",
+  "title": "Kill sheeps",
   "type": "KILL_MOB",
   "target": "minecraft:sheep",
   "requiredAmount": 3,

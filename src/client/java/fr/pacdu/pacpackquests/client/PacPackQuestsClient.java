@@ -48,7 +48,7 @@ public class PacPackQuestsClient implements ClientModInitializer {
 			context.client().execute(() -> {
 				net.minecraft.item.Item item = net.minecraft.registry.Registries.ITEM.get(Identifier.of(payload.iconId()));
 				QuestDefinition def = new QuestDefinition(
-						payload.questId(), payload.title(), TaskType.MINE_BLOCK, "",
+						payload.questId(), payload.title(), payload.category(), TaskType.MINE_BLOCK, "",
 						payload.requiredAmount(), new net.minecraft.item.ItemStack(item), net.minecraft.item.ItemStack.EMPTY, 0
 				);
 				CLIENT_DEFINITIONS.put(payload.questId(), def);

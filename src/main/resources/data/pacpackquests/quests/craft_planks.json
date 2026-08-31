@@ -1,9 +1,0 @@
-{
-  "title": "Craft planks",
-  "type": "CRAFT_ITEM",
-  "target": "#minecraft:planks",
-  "requiredAmount": 12,
-  "icon": "minecraft:oak_planks",
-  "reward": "minecraft:torch",
-  "rewardAmount": 8
-}

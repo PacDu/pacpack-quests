@@ -29,7 +29,7 @@ import java.util.UUID;
 
 public class PacPackQuests implements ModInitializer {
 
-	public static final String MOD_ID = "pacpackquests";
+	public static final String MOD_ID = "PacPackQuests";
 	// Initialize the SLF4J Logger with your Mod ID
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
@@ -59,7 +59,7 @@ public class PacPackQuests implements ModInitializer {
 
 				// Sync definition
 				ServerPlayNetworking.send(player, new QuestSyncPayload(
-						quest.id(), quest.title(), quest.requiredAmount(),
+						quest.id(), quest.title(), quest.category(), quest.requiredAmount(),
 						Registries.ITEM.getId(quest.icon().getItem()).toString()
 				));
 

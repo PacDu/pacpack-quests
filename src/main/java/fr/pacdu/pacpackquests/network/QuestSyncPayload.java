@@ -6,12 +6,13 @@ import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
-public record QuestSyncPayload(String questId, String title, int requiredAmount, String iconId) implements CustomPayload {
+public record QuestSyncPayload(String questId, String title, String category, int requiredAmount, String iconId) implements CustomPayload {
     public static final Id<QuestSyncPayload> ID = new Id<>(Identifier.of("pacpack-quests", "quest_sync"));
 
     public static final PacketCodec<RegistryByteBuf, QuestSyncPayload> CODEC = PacketCodec.tuple(
             PacketCodecs.STRING, QuestSyncPayload::questId,
             PacketCodecs.STRING, QuestSyncPayload::title,
+            PacketCodecs.STRING, QuestSyncPayload::category,
             PacketCodecs.INTEGER, QuestSyncPayload::requiredAmount,
             PacketCodecs.STRING, QuestSyncPayload::iconId,
             QuestSyncPayload::new
