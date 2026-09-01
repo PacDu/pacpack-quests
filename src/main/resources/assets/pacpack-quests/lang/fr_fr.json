@@ -2,5 +2,16 @@
   "key.pacpack-quests.open-quest-menu": "Ouvrir le menu des quêtes",
   "key.category.pacpack-quests.keys": "PacPack Quests",
   "gui.pacpack-quests.title": "Menu des Quêtes",
-  "gui.pacpack-quests.claimed": "Récupéré !"
+  "gui.pacpack-quests.claimed": "Récupéré !",
+  "gui.pacpack-quests.mine_block": "Miner",
+  "gui.pacpack-quests.craft_item": "Fabriquer",
+  "gui.pacpack-quests.kill_mob": "Tuer",
+  "tag.minecraft.logs": "Bûches",
+  "tag.minecraft.planks": "Planches",
+  "gui.pacpack-quests.status": "Statut",
+  "gui.pacpack-quests.ready_to_claim": "Prêt à être récupéré !",
+  "gui.pacpack-quests.completed": "Complété",
+  "gui.pacpack-quests.locked": "Verrouillé",
+  "gui.pacpack-quests.reward": "Récompense",
+  "gui.pacpack-quests.progress": "Avancement"
 }

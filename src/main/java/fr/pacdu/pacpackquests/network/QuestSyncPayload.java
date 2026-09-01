@@ -1,5 +1,6 @@
 package fr.pacdu.pacpackquests.network;
 
+import fr.pacdu.pacpackquests.TaskType;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
@@ -10,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public record QuestSyncPayload(
-        String questId, String title, String category, int requiredAmount,
+        String questId, String title, String category, String type, String target, int requiredAmount,
         String iconId, String rewardId, int rewardAmount, List<String> parents,
         int displayX, int displayY
 ) implements CustomPayload {
@@ -22,6 +23,8 @@ public record QuestSyncPayload(
                 buf.writeString(value.questId());
                 buf.writeString(value.title());
                 buf.writeString(value.category());
+                buf.writeString(value.type());
+                buf.writeString(value.target());
                 buf.writeInt(value.requiredAmount());
                 buf.writeString(value.iconId());
                 buf.writeString(value.rewardId());
@@ -31,6 +34,8 @@ public record QuestSyncPayload(
                 buf.writeInt(value.displayY());
             },
             buf -> new QuestSyncPayload(
+                    buf.readString(),
+                    buf.readString(),
                     buf.readString(),
                     buf.readString(),
                     buf.readString(),

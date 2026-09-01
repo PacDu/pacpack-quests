@@ -1,16 +1,24 @@
 package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.block.Block;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.resource.language.I18n;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagKey;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +34,7 @@ public class QuestScreen extends Screen {
 	private final int tabHeight = 20;
 
 	// Node now includes parents and lock status
-	record QuestNode(String id, String title, int x, int y, ItemStack icon, ItemStack reward, int rewardAmount, List<String> parents, boolean isLocked) {}
+	record QuestNode(String id, String title, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, int rewardAmount, List<String> parents, boolean isLocked) {}
 
 	public QuestScreen() {
 		super(Text.translatable("gui.pacpack-quests.title"));
@@ -103,7 +111,7 @@ public class QuestScreen extends Screen {
 				}
 
 				questList.add(new QuestNode(
-						quest.id(), quest.title(), screenX, screenY,
+						quest.id(), quest.title(), screenX, screenY, quest.type(), quest.target(),
 						quest.icon(), quest.reward(), quest.rewardAmount(),
 						quest.parents(), locked
 				));
@@ -145,7 +153,7 @@ public class QuestScreen extends Screen {
 
 		// --- DRAW QUEST NODES ---
 		for (QuestNode quest : questList) {
-			int current = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+			int progress = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
 			int requiredAmount = PacPackQuestsClient.CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
 			boolean claimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
@@ -154,7 +162,7 @@ public class QuestScreen extends Screen {
 				bgColor = 0xFF221111; // Very dark red for locked
 			} else if (claimed) {
 				bgColor = 0xFF225522; // Muted green
-			} else if (current >= requiredAmount) {
+			} else if (progress >= requiredAmount) {
 				bgColor = 0xFF555522; // Muted gold
 			}
 
@@ -166,35 +174,36 @@ public class QuestScreen extends Screen {
 			String progressText;
 			int textColor;
 			if (quest.isLocked()) {
-				progressText = "Locked";
+				progressText = "gui.pacpack-quests.locked";
 				textColor = 0xFFFF5555;
 			} else if (claimed) {
-				progressText = "Done";
+				progressText = "gui.done";
 				textColor = 0xFF55FF55;
 			} else {
-				progressText = current + "/" + requiredAmount;
-				textColor = current >= requiredAmount ? 0xFFFFFF55 : 0xFFAAAAAA;
+				progressText = progress + "/" + requiredAmount;
+				textColor = progress >= requiredAmount ? 0xFFFFFF55 : 0xFFAAAAAA;
 			}
 
-			context.drawText(this.textRenderer, Text.literal(progressText), quest.x() - 2, quest.y() + 22, textColor, true);
+			context.drawText(this.textRenderer, Text.translatable(progressText), quest.x() - 2, quest.y() + 22, textColor, true);
 
 			// Rich tooltip
 			if (isHovering(quest, mouseX, mouseY)) {
 				List<Text> tooltip = new ArrayList<>();
 
-				tooltip.add(Text.literal(quest.title()).formatted(Formatting.GOLD, Formatting.BOLD));
+				tooltip.add(Text.translatable(quest.title()).formatted(Formatting.GOLD, Formatting.BOLD));
 
 				if (claimed) {
-					tooltip.add(Text.literal("Status: Completed").formatted(Formatting.GREEN));
-				} else if (current >= requiredAmount) {
-					tooltip.add(Text.literal("Status: Ready to Claim!").formatted(Formatting.YELLOW));
+					tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.status") + ": " + I18n.translate("gui.pacpack-quests.claimed")).formatted(Formatting.GREEN));
+				} else if (progress >= requiredAmount) {
+					tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.status") + ": " + I18n.translate("gui.pacpack-quests.ready_to_claim")).formatted(Formatting.YELLOW));
 				} else if (quest.isLocked()) {
-					tooltip.add(Text.literal("Status: Locked").formatted(Formatting.RED));
+					tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.status") + ": " + I18n.translate("gui.pacpack-quests.locked")).formatted(Formatting.RED));
 				} else {
-					tooltip.add(Text.literal("Progress: " + current + " / " + requiredAmount).formatted(Formatting.GRAY));
+					tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests." + quest.type().toString().toLowerCase()) + ": " + getTranslatedTargetName(quest.target())).formatted(Formatting.GRAY));
+					tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.progress") + ": " + progress + " / " + requiredAmount).formatted(Formatting.GRAY));
 				}
 
-				tooltip.add(Text.literal("Reward: " + quest.rewardAmount() + "x ").append(quest.reward().getName()).formatted(claimed ? Formatting.GREEN : Formatting.AQUA));
+				tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.reward") + ": " + quest.rewardAmount() + "x ").append(quest.reward().getName()).formatted(claimed ? Formatting.GREEN : Formatting.AQUA));
 
 				context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
 			}
@@ -274,5 +283,28 @@ public class QuestScreen extends Screen {
 	private boolean isHovering(QuestNode quest, int mouseX, int mouseY) {
 		return mouseX >= quest.x() - 4 && mouseX <= quest.x() + 20 &&
 				mouseY >= quest.y() - 4 && mouseY <= quest.y() + 20;
+	}
+
+	private String getTranslatedTargetName(String target) {
+		if (target.startsWith("#")) {
+			// It's a Tag (e.g., #minecraft:logs)
+			// 1. We create a custom translation key: "tag.minecraft.logs"
+			String tagKey = "tag." + target.substring(1).replace(":", ".");
+
+			// 2. We check if you provided a translation for it in your mod's lang file
+			if (I18n.hasTranslation(tagKey)) {
+				return I18n.translate(tagKey);
+			} else {
+				// 3. Fallback: Format the raw name nicely (e.g., "logs" -> "Any Logs")
+				String path = Identifier.of(target.substring(1)).getPath();
+				String formatted = path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
+				return "Any " + formatted;
+			}
+		} else {
+			// It's a specific Item (e.g., minecraft:oak_planks)
+			// We fetch the Item from the registry and ask for its native translated name
+			Item item = Registries.ITEM.get(Identifier.of(target));
+			return item.getName().getString(); // Returns "Oak Planks" or "Planches de chêne"
+		}
 	}
 }

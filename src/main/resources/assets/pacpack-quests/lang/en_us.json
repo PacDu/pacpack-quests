@@ -2,5 +2,16 @@
   "key.pacpack-quests.open-quest-menu": "Open Quest Menu",
   "key.category.pacpack-quests.keys": "PacPack Quests",
   "gui.pacpack-quests.title": "Quest Menu",
-  "gui.pacpack-quests.claimed": "Claimed !"
+  "gui.pacpack-quests.claimed": "Claimed !",
+  "gui.pacpack-quests.mine_block": "Mine",
+  "gui.pacpack-quests.craft_item": "Craft",
+  "gui.pacpack-quests.kill_mob": "Kill",
+  "tag.minecraft.logs": "Logs",
+  "tag.minecraft.planks": "Planks",
+  "gui.pacpack-quests.status": "Status",
+  "gui.pacpack-quests.ready_to_claim": "Ready to Claim!",
+  "gui.pacpack-quests.completed": "Completed",
+  "gui.pacpack-quests.locked": "Locked",
+  "gui.pacpack-quests.reward": "Reward",
+  "gui.pacpack-quests.progress": "Progress"
 }
