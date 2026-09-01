@@ -13,5 +13,6 @@
   "gui.pacpack-quests.completed": "Complété",
   "gui.pacpack-quests.locked": "Verrouillé",
   "gui.pacpack-quests.reward": "Récompense",
-  "gui.pacpack-quests.progress": "Avancement"
+  "gui.pacpack-quests.progress": "Avancement",
+  "gui.pacpack-quests.levels": "Niveaux d'XP"
 }

@@ -4,8 +4,8 @@
   "target": "#minecraft:logs",
   "requiredAmount": 3,
   "icon": "minecraft:oak_log",
-  "reward": "minecraft:bread",
-  "rewardAmount": 16,
+  "reward": "level",
+  "rewardAmount": 3,
   "displayX": 0,
   "displayY": 0
 }

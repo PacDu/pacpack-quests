@@ -1,6 +1,7 @@
 package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -34,7 +35,7 @@ public class QuestScreen extends Screen {
 	private final int tabHeight = 20;
 
 	// Node now includes parents and lock status
-	record QuestNode(String id, String title, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, int rewardAmount, List<String> parents, boolean isLocked) {}
+	record QuestNode(String id, String title, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) {}
 
 	public QuestScreen() {
 		super(Text.translatable("gui.pacpack-quests.title"));
@@ -112,7 +113,7 @@ public class QuestScreen extends Screen {
 
 				questList.add(new QuestNode(
 						quest.id(), quest.title(), screenX, screenY, quest.type(), quest.target(),
-						quest.icon(), quest.reward(), quest.rewardAmount(),
+						quest.icon(), quest.reward(), quest.rewardType(), quest.rewardAmount(),
 						quest.parents(), locked
 				));
 			}
@@ -203,7 +204,20 @@ public class QuestScreen extends Screen {
 					tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.progress") + ": " + progress + " / " + requiredAmount).formatted(Formatting.GRAY));
 				}
 
-				tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.reward") + ": " + quest.rewardAmount() + "x ").append(quest.reward().getName()).formatted(claimed ? Formatting.GREEN : Formatting.AQUA));
+				switch (quest.rewardType()) {
+					case XP -> tooltip.add(Text.translatable("gui.pacpack-quests.reward")
+							.append(": " + quest.rewardAmount() + " XP")
+							.formatted(claimed ? Formatting.GREEN : Formatting.LIGHT_PURPLE));
+
+					case LEVEL -> tooltip.add(Text.translatable("gui.pacpack-quests.reward")
+							.append(": " + quest.rewardAmount() + " ")
+							.append(Text.translatable("gui.pacpack-quests.levels"))
+							.formatted(claimed ? Formatting.GREEN : Formatting.LIGHT_PURPLE));
+
+					case ITEM -> tooltip.add(Text.translatable("gui.pacpack-quests.reward")
+							.append(": " + quest.rewardAmount() + "x ").append(quest.reward().getName())
+							.formatted(claimed ? Formatting.GREEN : Formatting.AQUA));
+				}
 
 				context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
 			}

@@ -51,13 +51,12 @@ public class PacPackQuestsClient implements ClientModInitializer {
 			context.client().execute(() -> {
 				Item icon = Registries.ITEM.get(Identifier.of(payload.iconId()));
 				Item reward = Registries.ITEM.get(Identifier.of(payload.rewardId()));
-				TaskType type = TaskType.valueOf(payload.type());
 
 				// Reconstruct the quest definition with the newly received reward data
 				QuestDefinition def = new QuestDefinition(
-						payload.questId(), payload.title(), payload.category(), type, payload.target(),
-						payload.requiredAmount(), new ItemStack(icon), new ItemStack(reward), payload.rewardAmount(),
-						payload.parents(), payload.displayX(), payload.displayY()
+						payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
+						payload.requiredAmount(), new ItemStack(icon), new ItemStack(reward), payload.rewardType(),
+						payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
 				);
 				CLIENT_DEFINITIONS.put(payload.questId(), def);
 			});

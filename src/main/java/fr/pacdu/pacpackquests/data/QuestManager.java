@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import net.fabricmc.loader.api.FabricLoader;
@@ -132,8 +133,23 @@ public class QuestManager {
         Item iconItem = Registries.ITEM.get(Identifier.of(json.get("icon").getAsString()));
         if (Objects.equals(iconItem.toString(), "minecraft:air")) errorMessage.append(" The icon ").append(json.get("icon")).append(" does not exist,");
 
-        Item rewardItem = Registries.ITEM.get(Identifier.of(json.get("reward").getAsString()));
-        if (Objects.equals(rewardItem.toString(), "minecraft:air")) errorMessage.append(" The reward ").append(json.get("reward")).append(" does not exist,");
+        String rewardStr = json.get("reward").getAsString();
+
+        RewardType rewardType;
+        Item rewardItem;
+
+        if (rewardStr.equalsIgnoreCase("xp")) {
+            rewardType = RewardType.XP;
+            rewardItem = net.minecraft.item.Items.EXPERIENCE_BOTTLE;
+        } else if (rewardStr.equalsIgnoreCase("level") || rewardStr.equalsIgnoreCase("levels")) {
+            rewardType = RewardType.LEVEL;
+            // We can use an enchanted book to visually differentiate Levels from raw XP points
+            rewardItem = net.minecraft.item.Items.ENCHANTED_BOOK;
+        } else {
+            rewardType = RewardType.ITEM;
+            rewardItem = Registries.ITEM.get(Identifier.of(rewardStr));
+            if (Objects.equals(rewardItem.toString(), "minecraft:air")) errorMessage.append(" The reward ").append(json.get("reward")).append(" does not exist,");
+        }
 
         int rewardAmount = json.get("rewardAmount").getAsInt();
         if (rewardAmount <= 0) errorMessage.append(" The reward amount must be greater than 0,");
@@ -157,8 +173,8 @@ public class QuestManager {
         }
 
         QuestDefinition quest = new QuestDefinition(
-                questId, title, category, type, target, requiredAmount,
-                new ItemStack(iconItem), new ItemStack(rewardItem), rewardAmount, parents, displayX, displayY
+                questId, title, category, type, target, requiredAmount, new ItemStack(iconItem),
+                new ItemStack(rewardItem), rewardType, rewardAmount, parents, displayX, displayY
         );
 
         LOADED_QUESTS.put(questId, quest);

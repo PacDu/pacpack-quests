@@ -4,8 +4,8 @@
   "target": "minecraft:sheep",
   "requiredAmount": 3,
   "icon": "minecraft:white_wool",
-  "reward": "minecraft:coal",
-  "rewardAmount": 8,
+  "reward": "xp",
+  "rewardAmount": 50,
   "displayX": 0,
   "displayY": 1
 }

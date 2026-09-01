@@ -62,11 +62,12 @@ public class PacPackQuests implements ModInitializer {
 						quest.id(),
 						quest.title(),
 						quest.category(),
-						quest.type().name(),
+						quest.type(),
 						quest.target(),
 						quest.requiredAmount(),
 						Registries.ITEM.getId(quest.icon().getItem()).toString(),
 						Registries.ITEM.getId(quest.reward().getItem()).toString(),
+						quest.rewardType(),
 						quest.rewardAmount(),
 						quest.parents(),
 						quest.displayX(),
@@ -97,13 +98,24 @@ public class PacPackQuests implements ModInitializer {
 					// Anti-cheat verification
 					if (progress >= quest.requiredAmount() && !claimed) {
 
+						// Give the reward to the player
+						switch (quest.rewardType()) {
+							case XP -> player.addExperience(quest.rewardAmount());
+
+							case LEVEL -> player.addExperienceLevels(quest.rewardAmount());
+
+							case ITEM -> {
+								if (quest.rewardAmount() > 0 && !quest.reward().isEmpty()) {
+									ItemStack rewardStack = new ItemStack(quest.reward().getItem(), quest.rewardAmount());
+									if (!player.getInventory().insertStack(rewardStack)) {
+										player.dropItem(rewardStack, false);
+									}
+								}
+							}
+						}
+
 						// Mark as claimed
 						questState.setClaimed(playerId, quest.id(), true);
-
-						// Give the reward to the player
-						ItemStack stack = quest.reward().copy();
-						stack.setCount(quest.rewardAmount());
-						player.getInventory().offerOrDrop(stack);
 
 						// Send visual update back to the client
 						ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, true));
