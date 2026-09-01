@@ -55,7 +55,8 @@ public class PacPackQuestsClient implements ClientModInitializer {
 				// Reconstruct the quest definition with the newly received reward data
 				QuestDefinition def = new QuestDefinition(
 						payload.questId(), payload.title(), payload.category(), null, "",
-						payload.requiredAmount(), new ItemStack(icon), new ItemStack(reward), payload.rewardAmount()
+						payload.requiredAmount(), new ItemStack(icon), new ItemStack(reward), payload.rewardAmount(),
+						payload.parents(), payload.displayX(), payload.displayY()
 				);
 				CLIENT_DEFINITIONS.put(payload.questId(), def);
 			});

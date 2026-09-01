@@ -5,5 +5,7 @@
   "requiredAmount": 3,
   "icon": "minecraft:white_wool",
   "reward": "minecraft:coal",
-  "rewardAmount": 8
+  "rewardAmount": 8,
+  "displayX": 0,
+  "displayY": 1
 }

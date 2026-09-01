@@ -5,5 +5,7 @@
   "requiredAmount": 3,
   "icon": "minecraft:oak_log",
   "reward": "minecraft:bread",
-  "rewardAmount": 16
+  "rewardAmount": 16,
+  "displayX": 0,
+  "displayY": 0
 }

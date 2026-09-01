@@ -1,10 +1,11 @@
 {
   "title": "Craft blaze powder",
-  "category": "Nether",
   "type": "CRAFT_ITEM",
   "target": "minecraft:blaze_powder",
   "requiredAmount": 2,
   "icon": "minecraft:blaze_powder",
   "reward": "minecraft:diamond",
-  "rewardAmount": 1
+  "rewardAmount": 1,
+  "displayX": 0,
+  "displayY": 0
 }

@@ -13,20 +13,23 @@ public class QuestProgressHandler {
 
     // Generic method to safely increment progress and sync it with the client
     public static void incrementProgress(ServerPlayerEntity player, QuestDefinition quest, int amountToAdd) {
-        // Objects.requireNonNull garantit à l'IDE que le résultat ne sera jamais null
         MinecraftServer server = Objects.requireNonNull(player.getEntityWorld().getServer());
         QuestState state = QuestState.getServerState(server);
         UUID playerId = player.getUuid();
 
+        // Dependency Check: Block progression if any parent is not claimed yet
+        for (String parentId : quest.parents()) {
+            if (!state.isClaimed(playerId, parentId)) {
+                return;
+            }
+        }
+
         int current = state.getProgress(playerId, quest.id());
 
         if (current < quest.requiredAmount()) {
-            // Prevent progression from exceeding the required amount
             int newProgress = Math.min(current + amountToAdd, quest.requiredAmount());
-
             state.setProgress(playerId, quest.id(), newProgress);
 
-            // Send visual update back to the client
             ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), newProgress, false));
         }
     }

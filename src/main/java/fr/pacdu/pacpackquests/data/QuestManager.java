@@ -1,6 +1,8 @@
 package fr.pacdu.pacpackquests.data;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
@@ -28,7 +30,7 @@ public class QuestManager {
     // Central storage for all loaded quests
     public static final Map<String, QuestDefinition> LOADED_QUESTS = new HashMap<>();
     private static final Gson GSON = new Gson();
-    private static final List<String> QUEST_DEFINITION_REQUIDED_LIST = Arrays.asList("title", "type", "target", "requiredAmount", "icon", "reward", "rewardAmount");
+    private static final List<String> QUEST_DEFINITION_REQUIDED_LIST = Arrays.asList("title", "type", "target", "requiredAmount", "icon", "reward", "rewardAmount", "displayX",  "displayY");
 
     public static void registerLoader() {
         SynchronousResourceReloader questReloader = manager -> {
@@ -43,10 +45,16 @@ public class QuestManager {
                          InputStreamReader reader = new InputStreamReader(stream)) {
 
                         JsonObject json = GSON.fromJson(reader, JsonObject.class);
-                        String fullPath = fileId.getPath();
-                        String questId = fullPath.substring(fullPath.lastIndexOf('/') + 1, fullPath.length() - 5);
 
-                        AssertParseAndAddQuest(questId, json);
+                        // Extract relative path after "quests/" (e.g., "quests/nether/blaze.json" -> "nether/blaze.json")
+                        String rawPath = fileId.getPath();
+                        String relativePath = rawPath.substring(7);
+                        int lastSlash = relativePath.lastIndexOf('/');
+
+                        String category = lastSlash == -1 ? "main" : relativePath.substring(0, lastSlash);
+                        String questId = relativePath.substring(lastSlash + 1, relativePath.length() - 5);
+
+                        AssertParseAndAddQuest(questId, category, json);
                     } catch (Exception e) {
                         PacPackQuests.LOGGER.error("[PacPackQuests] Failed to load Datapack quest: {}", fileId, e);
                     }
@@ -70,11 +78,16 @@ public class QuestManager {
                                 try (InputStreamReader reader = new InputStreamReader(Files.newInputStream(path))) {
                                     JsonObject json = GSON.fromJson(reader, JsonObject.class);
 
-                                    String fileName = path.getFileName().toString();
-                                    String questId = fileName.substring(0, fileName.length() - 5);
+                                    // Relativize path to get folders (e.g., "C:/.../config/.../nether/blaze.json" -> "nether/blaze.json")
+                                    Path relativePath = configDir.relativize(path);
+                                    String pathStr = relativePath.toString().replace('\\', '/');
+                                    int lastSlash = pathStr.lastIndexOf('/');
+
+                                    String category = lastSlash == -1 ? "main" : pathStr.substring(0, lastSlash);
+                                    String questId = pathStr.substring(lastSlash + 1, pathStr.length() - 5);
 
                                     // Config quests will overwrite datapack quests if the ID is identical
-                                    AssertParseAndAddQuest(questId, json);
+                                    AssertParseAndAddQuest(questId, category, json);
                                 } catch (Exception e) {
                                     PacPackQuests.LOGGER.error("Failed to load Config quest: {}", path.getFileName(), e);
                                 }
@@ -93,7 +106,7 @@ public class QuestManager {
         );
     }
 
-    private static void AssertParseAndAddQuest(String questId, JsonObject json) {
+    private static void AssertParseAndAddQuest(String questId, String category, JsonObject json) {
         StringBuilder errorMessage = new StringBuilder();
 
         for (String e : QUEST_DEFINITION_REQUIDED_LIST) {
@@ -106,8 +119,6 @@ public class QuestManager {
 
         String title = json.get("title").getAsString();
         if (title.isEmpty()) errorMessage.append(" The title cannot be empty,");
-
-        String category = json.has("category") ? json.get("category").getAsString() : "main";
 
         TaskType type = TaskType.isValid(json.get("type").getAsString()) ? TaskType.valueOf(json.get("type").getAsString()) : null;
         if (type == null) errorMessage.append(" The type \"").append(json.get("type")).append("\" does not exist,");
@@ -127,6 +138,18 @@ public class QuestManager {
         int rewardAmount = json.get("rewardAmount").getAsInt();
         if (rewardAmount <= 0) errorMessage.append(" The reward amount must be greater than 0,");
 
+        // Parse optional parents array
+        List<String> parents = new ArrayList<>();
+        if (json.has("parents")) {
+            JsonArray parentsArray = json.getAsJsonArray("parents");
+            for (JsonElement element : parentsArray) {
+                parents.add(element.getAsString());
+            }
+        }
+
+        int displayX = json.get("displayX").getAsInt();
+        int displayY = json.get("displayY").getAsInt();
+
         if (!errorMessage.isEmpty()) {
             errorMessage.deleteCharAt(0).deleteCharAt(errorMessage.length() - 1).insert(0, "WARN : There are errors in the json file of quest \"" + questId + "\" : ");
             PacPackQuests.LOGGER.warn(errorMessage.toString());
@@ -135,7 +158,7 @@ public class QuestManager {
 
         QuestDefinition quest = new QuestDefinition(
                 questId, title, category, type, target, requiredAmount,
-                new ItemStack(iconItem), new ItemStack(rewardItem), rewardAmount
+                new ItemStack(iconItem), new ItemStack(rewardItem), rewardAmount, parents, displayX, displayY
         );
 
         LOADED_QUESTS.put(questId, quest);

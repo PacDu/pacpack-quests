@@ -1,15 +1,22 @@
 package fr.pacdu.pacpackquests.network;
 
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
-public record QuestSyncPayload(String questId, String title, String category, int requiredAmount, String iconId, String rewardId, int rewardAmount) implements CustomPayload {
+import java.util.ArrayList;
+import java.util.List;
+
+public record QuestSyncPayload(
+        String questId, String title, String category, int requiredAmount,
+        String iconId, String rewardId, int rewardAmount, List<String> parents,
+        int displayX, int displayY
+) implements CustomPayload {
 
     public static final Id<QuestSyncPayload> ID = new Id<>(Identifier.of("pacpackquests", "quest_sync"));
 
-    // Manual codec to safely handle 7 variables
     public static final PacketCodec<RegistryByteBuf, QuestSyncPayload> CODEC = PacketCodec.of(
             (value, buf) -> {
                 buf.writeString(value.questId());
@@ -19,6 +26,9 @@ public record QuestSyncPayload(String questId, String title, String category, in
                 buf.writeString(value.iconId());
                 buf.writeString(value.rewardId());
                 buf.writeInt(value.rewardAmount());
+                buf.writeCollection(value.parents(), PacketByteBuf::writeString);
+                buf.writeInt(value.displayX());
+                buf.writeInt(value.displayY());
             },
             buf -> new QuestSyncPayload(
                     buf.readString(),
@@ -27,6 +37,9 @@ public record QuestSyncPayload(String questId, String title, String category, in
                     buf.readInt(),
                     buf.readString(),
                     buf.readString(),
+                    buf.readInt(),
+                    buf.readCollection(ArrayList::new, PacketByteBuf::readString),
+                    buf.readInt(),
                     buf.readInt()
             )
     );
