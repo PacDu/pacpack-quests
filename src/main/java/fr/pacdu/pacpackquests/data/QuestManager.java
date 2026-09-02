@@ -159,7 +159,10 @@ public class QuestManager {
         if (json.has("parents")) {
             JsonArray parentsArray = json.getAsJsonArray("parents");
             for (JsonElement element : parentsArray) {
-                parents.add(element.getAsString());
+                if (!element.getAsString().equals(questId))
+                    parents.add(element.getAsString());
+                else
+                    PacPackQuests.LOGGER.warn("Error in the quest \"{}\" : a quest can't have itself as parent", questId);
             }
         }
 
@@ -167,7 +170,7 @@ public class QuestManager {
         int displayY = json.get("displayY").getAsInt();
 
         if (!errorMessage.isEmpty()) {
-            errorMessage.deleteCharAt(0).deleteCharAt(errorMessage.length() - 1).insert(0, "WARN : There are errors in the json file of quest \"" + questId + "\" : ");
+            errorMessage.deleteCharAt(0).deleteCharAt(errorMessage.length() - 1).insert(0, "There are errors in the json file of quest \"" + questId + "\" : ");
             PacPackQuests.LOGGER.warn(errorMessage.toString());
             return;
         }
