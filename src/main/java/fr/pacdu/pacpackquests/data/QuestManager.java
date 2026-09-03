@@ -50,12 +50,8 @@ public class QuestManager {
                         // Extract relative path after "quests/" (e.g., "quests/nether/blaze.json" -> "nether/blaze.json")
                         String rawPath = fileId.getPath();
                         String relativePath = rawPath.substring(7);
-                        int lastSlash = relativePath.lastIndexOf('/');
 
-                        String category = lastSlash == -1 ? "main" : relativePath.substring(0, lastSlash);
-                        String questId = relativePath.substring(lastSlash + 1, relativePath.length() - 5);
-
-                        AssertParseAndAddQuest(questId, category, json);
+                        AssertParseAndAddQuest(relativePath, json);
                     } catch (Exception e) {
                         PacPackQuests.LOGGER.error("[PacPackQuests] Failed to load Datapack quest: {}", fileId, e);
                     }
@@ -82,13 +78,9 @@ public class QuestManager {
                                     // Relativize path to get folders (e.g., "C:/.../config/.../nether/blaze.json" -> "nether/blaze.json")
                                     Path relativePath = configDir.relativize(path);
                                     String pathStr = relativePath.toString().replace('\\', '/');
-                                    int lastSlash = pathStr.lastIndexOf('/');
-
-                                    String category = lastSlash == -1 ? "main" : pathStr.substring(0, lastSlash);
-                                    String questId = pathStr.substring(lastSlash + 1, pathStr.length() - 5);
 
                                     // Config quests will overwrite datapack quests if the ID is identical
-                                    AssertParseAndAddQuest(questId, category, json);
+                                    AssertParseAndAddQuest(pathStr, json);
                                 } catch (Exception e) {
                                     PacPackQuests.LOGGER.error("Failed to load Config quest: {}", path.getFileName(), e);
                                 }
@@ -107,7 +99,10 @@ public class QuestManager {
         );
     }
 
-    private static void AssertParseAndAddQuest(String questId, String category, JsonObject json) {
+    private static void AssertParseAndAddQuest(String filePath, JsonObject json) {
+        int lastSlash = filePath.lastIndexOf('/');
+        String questId = filePath.substring(lastSlash + 1, filePath.length() - 5);
+
         StringBuilder errorMessage = new StringBuilder();
 
         for (String e : QUEST_DEFINITION_REQUIDED_LIST) {
@@ -120,6 +115,9 @@ public class QuestManager {
 
         String title = json.get("title").getAsString();
         if (title.isEmpty()) errorMessage.append(" The title cannot be empty,");
+
+        if (lastSlash == -1) errorMessage.append(" The quest must be in a category (a subfolder),");
+        String category = lastSlash == -1 ? "error" : filePath.substring(0, lastSlash);
 
         TaskType type = TaskType.isValid(json.get("type").getAsString()) ? TaskType.valueOf(json.get("type").getAsString()) : null;
         if (type == null) errorMessage.append(" The type \"").append(json.get("type")).append("\" does not exist,");

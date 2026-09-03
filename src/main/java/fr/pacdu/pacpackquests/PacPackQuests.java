@@ -1,10 +1,14 @@
 package fr.pacdu.pacpackquests;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestProgressHandler;
 import fr.pacdu.pacpackquests.data.QuestState;
 import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
+import fr.pacdu.pacpackquests.network.MoveQuestPayload;
 import fr.pacdu.pacpackquests.network.QuestProgressPayload;
 import fr.pacdu.pacpackquests.network.QuestSyncPayload;
 
@@ -14,6 +18,7 @@ import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
 import net.minecraft.entity.EntityType;
 import net.minecraft.item.ItemStack;
@@ -25,7 +30,11 @@ import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
+
+import static net.fabricmc.fabric.impl.resource.pack.ModPackResourcesUtil.GSON;
 
 public class PacPackQuests implements ModInitializer {
 
@@ -45,6 +54,7 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(QuestProgressPayload.ID, QuestProgressPayload.CODEC);
 		// C2S (Client to Server) : The client requests to claim their reward
 		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
 
 		// 1. Connection Event: Sync all quests progress when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -119,6 +129,65 @@ public class PacPackQuests implements ModInitializer {
 
 						// Send visual update back to the client
 						ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, true));
+					}
+				}
+			});
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(MoveQuestPayload.ID, (payload, context) -> {
+			context.server().execute(() -> {
+				ServerPlayerEntity player = context.player();
+
+				// Security: Prevent malicious clients from modifying files
+				if (!context.server().getPlayerManager().isOperator(player.getPlayerConfigEntry())) return;
+
+				QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
+				if (quest == null) return;
+
+				// Path logic depends on how you generate your files.
+				// Example path: config/pacpackquests/quests/categoryName/questId.json
+				Path questFile = FabricLoader.getInstance().getConfigDir()
+						.resolve("pacpackquests/quests/" + quest.category() + "/" + payload.questId() + ".json");
+
+				if (Files.exists(questFile)) {
+					try {
+						// 1. Read existing JSON
+						JsonObject json = GSON.fromJson(Files.readString(questFile), JsonObject.class);
+
+						// 2. Modify X and Y
+						json.addProperty("displayX", payload.newX());
+						json.addProperty("displayY", payload.newY());
+
+						// 3. Save back to disk
+						Gson gson = new GsonBuilder().setPrettyPrinting().create();
+						Files.writeString(questFile, gson.toJson(json));
+
+						// 4. Update the server's live memory (no /reload required)
+						QuestDefinition newDef = new QuestDefinition(
+								quest.id(), quest.title(), quest.category(), // Updated coordinates
+								quest.type(), quest.target(), quest.requiredAmount(),
+								quest.icon(), quest.reward(), quest.rewardType(),
+								quest.rewardAmount(), quest.parents(),
+								payload.newX(), payload.newY()
+						);
+						QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
+
+// 5. Broadcast the updated quest to all connected players
+						QuestSyncPayload syncPacket = new QuestSyncPayload(
+								newDef.id(), newDef.title(), newDef.category(), newDef.type(),
+								newDef.target(), newDef.requiredAmount(),
+								Registries.ITEM.getId(newDef.icon().getItem()).toString(),
+								Registries.ITEM.getId(newDef.reward().getItem()).toString(),
+								newDef.rewardType(), newDef.rewardAmount(), newDef.parents(),
+								payload.newX(), payload.newY()
+						);
+
+						for (ServerPlayerEntity onlinePlayer : context.server().getPlayerManager().getPlayerList()) {
+							ServerPlayNetworking.send(onlinePlayer, syncPacket);
+						}
+
+					} catch (Exception e) {
+						PacPackQuests.LOGGER.error("Failed to update quest file!", e);
 					}
 				}
 			});
