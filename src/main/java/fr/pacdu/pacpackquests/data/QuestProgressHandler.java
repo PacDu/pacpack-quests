@@ -17,9 +17,9 @@ public class QuestProgressHandler {
         QuestState state = QuestState.getServerState(server);
         UUID playerId = player.getUuid();
 
-        // Dependency Check: Block progression if any parent is not claimed yet
+        // Dependency Check: Block progression if any parent is not finished yet
         for (String parentId : quest.parents()) {
-            if (!state.isClaimed(playerId, parentId)) {
+            if (!state.isFinished(playerId, parentId)) {
                 return;
             }
         }
@@ -28,9 +28,10 @@ public class QuestProgressHandler {
 
         if (current < quest.requiredAmount()) {
             int newProgress = Math.min(current + amountToAdd, quest.requiredAmount());
+            boolean isFinished = newProgress >= quest.requiredAmount();
             state.setProgress(playerId, quest.id(), newProgress);
 
-            ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), newProgress, false));
+            ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), newProgress, isFinished, false));
         }
     }
 }

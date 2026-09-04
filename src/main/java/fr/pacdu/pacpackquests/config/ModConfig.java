@@ -1,8 +1,6 @@
 package fr.pacdu.pacpackquests.config;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import fr.pacdu.pacpackquests.PacPackQuests;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -10,6 +8,9 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class ModConfig {
     // We use GsonBuilder to make the JSON file readable (pretty printing)
@@ -18,14 +19,27 @@ public class ModConfig {
 
     // Default value
     public static boolean loadDefaultQuests = true;
+    public static List<String> categoryOrder =  Arrays.asList("overworld", "nether");
 
     public static void load() {
         try {
             if (Files.exists(CONFIG_FILE)) {
                 try (Reader reader = Files.newBufferedReader(CONFIG_FILE)) {
                     JsonObject json = GSON.fromJson(reader, JsonObject.class);
-                    if (json != null && json.has("loadDefaultQuests")) {
-                        loadDefaultQuests = json.get("loadDefaultQuests").getAsBoolean();
+                    boolean configIsMissing = false;
+                    if (json != null) {
+                        if (json.has("loadDefaultQuests"))
+                            loadDefaultQuests = json.get("loadDefaultQuests").getAsBoolean();
+                        else configIsMissing = true;
+                        if (json.has("categoryOrder")) {
+                            categoryOrder.clear();
+                            JsonArray categoryOrderArray = json.getAsJsonArray("categoryOrder");
+                            for (JsonElement element : categoryOrderArray) {
+                                categoryOrder.add(element.getAsString());
+                            }
+                        }
+                        else configIsMissing = true;
+                        if (configIsMissing) save();
                     }
                 }
             } else {
@@ -42,6 +56,7 @@ public class ModConfig {
             Files.createDirectories(CONFIG_FILE.getParent());
             JsonObject json = new JsonObject();
             json.addProperty("loadDefaultQuests", loadDefaultQuests);
+            json.add("categoryOrder", GSON.toJsonTree(categoryOrder));
 
             try (Writer writer = Files.newBufferedWriter(CONFIG_FILE)) {
                 GSON.toJson(json, writer);

@@ -41,6 +41,7 @@ public class PacPackQuests implements ModInitializer {
 	public static final String MOD_ID = "PacPackQuests";
 	// Initialize the SLF4J Logger with your Mod ID
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	@Override
 	public void onInitialize() {
@@ -65,6 +66,7 @@ public class PacPackQuests implements ModInitializer {
 			// Send both quest definition and its current progress to the joining player
 			for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
 				int progress = state.getProgress(playerId, quest.id());
+				boolean finished = state.isFinished(playerId, quest.id());
 				boolean claimed = state.isClaimed(playerId, quest.id());
 
 				// Sync definition
@@ -85,7 +87,7 @@ public class PacPackQuests implements ModInitializer {
 				));
 
 				// Sync progress
-				ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, claimed));
+				ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, finished, claimed));
 			}
 		});
 
@@ -128,7 +130,7 @@ public class PacPackQuests implements ModInitializer {
 						questState.setClaimed(playerId, quest.id(), true);
 
 						// Send visual update back to the client
-						ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, true));
+						ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, true, true));
 					}
 				}
 			});
@@ -159,8 +161,7 @@ public class PacPackQuests implements ModInitializer {
 						json.addProperty("displayY", payload.newY());
 
 						// 3. Save back to disk
-						Gson gson = new GsonBuilder().setPrettyPrinting().create();
-						Files.writeString(questFile, gson.toJson(json));
+						Files.writeString(questFile, GSON.toJson(json));
 
 						// 4. Update the server's live memory (no /reload required)
 						QuestDefinition newDef = new QuestDefinition(
@@ -172,7 +173,7 @@ public class PacPackQuests implements ModInitializer {
 						);
 						QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
 
-// 5. Broadcast the updated quest to all connected players
+						// 5. Broadcast the updated quest to all connected players
 						QuestSyncPayload syncPacket = new QuestSyncPayload(
 								newDef.id(), newDef.title(), newDef.category(), newDef.type(),
 								newDef.target(), newDef.requiredAmount(),
@@ -214,11 +215,7 @@ public class PacPackQuests implements ModInitializer {
 						}
 
 						if (isTarget) {
-							int current = questState.getProgress(playerId, quest.id());
-							if (current < quest.requiredAmount()) {
-								questState.setProgress(playerId, quest.id(), current + 1);
-								ServerPlayNetworking.send((ServerPlayerEntity) player, new QuestProgressPayload(quest.id(), current + 1, false));
-							}
+							QuestProgressHandler.incrementProgress((ServerPlayerEntity) player, quest, 1);
 						}
 					}
 				}

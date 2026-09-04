@@ -25,6 +25,7 @@ public class PacPackQuestsClient implements ClientModInitializer {
 	// Maps to store progress and claim status for each quest ID on the client
 	public static final Map<String, QuestDefinition> CLIENT_DEFINITIONS = new HashMap<>();
 	public static final Map<String, Integer> CLIENT_PROGRESS = new HashMap<>();
+	public static final Map<String, Boolean> CLIENT_FINISHED = new HashMap<>();
 	public static final Map<String, Boolean> CLIENT_CLAIMED = new HashMap<>();
 
 	public static final KeyBinding.Category QUEST_CATEGORY = KeyBinding.Category.create(Identifier.of("pacpack-quests", "keys"));
@@ -66,6 +67,7 @@ public class PacPackQuestsClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(QuestProgressPayload.ID, (payload, context) -> {
 			context.client().execute(() -> {
 				CLIENT_PROGRESS.put(payload.questId(), payload.progress());
+				CLIENT_FINISHED.put(payload.questId(), payload.isFinished());
 				CLIENT_CLAIMED.put(payload.questId(), payload.isClaimed());
 			});
 		});

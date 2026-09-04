@@ -2,6 +2,7 @@ package fr.pacdu.pacpackquests.data;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import fr.pacdu.pacpackquests.QuestDefinition;
 import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.PersistentState;
@@ -18,7 +19,6 @@ public class QuestState extends PersistentState {
     public final Map<UUID, Map<String, Integer>> progress = new HashMap<>();
     public final Map<UUID, Map<String, Boolean>> claimed = new HashMap<>();
 
-    // Utility methods for modifying data by forcing a save (markDirty)
     public int getProgress(UUID player, String questId) {
         return progress.getOrDefault(player, new HashMap<>()).getOrDefault(questId, 0);
     }
@@ -26,6 +26,12 @@ public class QuestState extends PersistentState {
     public void setProgress(UUID player, String questId, int amount) {
         progress.computeIfAbsent(player, k -> new HashMap<>()).put(questId, amount);
         this.markDirty();
+    }
+
+    public boolean isFinished(UUID player, String questId) {
+        QuestDefinition quest = QuestManager.LOADED_QUESTS.get(questId);
+        int progress = getProgress(player, quest.id());
+        return progress >= quest.requiredAmount();
     }
 
     public boolean isClaimed(UUID player, String questId) {

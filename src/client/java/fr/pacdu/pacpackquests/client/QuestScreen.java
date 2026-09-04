@@ -3,9 +3,11 @@ package fr.pacdu.pacpackquests.client;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
 import fr.pacdu.pacpackquests.network.MoveQuestPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.impl.object.builder.FabricEntityTypeImpl;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
@@ -95,13 +97,32 @@ public class QuestScreen extends Screen {
 			}
 		}
 
-		if (categories.contains("main")) {
-			categories.remove("main");
-			categories.addFirst("main");
-		} else if (categories.isEmpty()) {
-			categories.add("main");
+		if (categories.isEmpty()) {
+			categories.add("overworld");
 		}
 
+		// --- CONFIG-BASED SORTING ---
+		// Replace ModConfig.categoryOrder with the actual variable from your config file
+		List<String> configuredOrder = ModConfig.categoryOrder;
+
+		categories.sort((cat1, cat2) -> {
+			int index1 = configuredOrder.indexOf(cat1);
+			int index2 = configuredOrder.indexOf(cat2);
+
+			// Both categories are missing from the config -> Sort them alphabetically at the end
+			if (index1 == -1 && index2 == -1) return cat1.compareTo(cat2);
+
+			// Only cat1 is missing -> Push it to the bottom
+			if (index1 == -1) return 1;
+
+			// Only cat2 is missing -> Push it to the bottom
+			if (index2 == -1) return -1;
+
+			// Both are in the config -> Sort them according to the configured order
+			return Integer.compare(index1, index2);
+		});
+
+		// Update selectedCategory if the previous one no longer exists
 		if (!categories.contains(selectedCategory)) {
 			selectedCategory = categories.getFirst();
 		}
@@ -126,7 +147,7 @@ public class QuestScreen extends Screen {
 				boolean locked = false;
 				if (quest.parents() != null) {
 					for (String parentId : quest.parents()) {
-						if (!PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(parentId, false)) {
+						if (!PacPackQuestsClient.CLIENT_FINISHED.getOrDefault(parentId, false)) {
 							locked = true;
 							break;
 						}
@@ -497,8 +518,13 @@ public class QuestScreen extends Screen {
 				return "Any " + formatted;
 			}
 		} else {
-			Item item = Registries.ITEM.get(Identifier.of(target));
-			return item.getName().getString();
+			Identifier id = Identifier.of(target);
+
+			if (!Registries.ITEM.containsId(id) && Registries.ENTITY_TYPE.containsId(id)) {
+				return Registries.ENTITY_TYPE.get(id).getName().getString();
+			}
+
+			return Registries.ITEM.get(id).getName().getString();
 		}
 	}
 
