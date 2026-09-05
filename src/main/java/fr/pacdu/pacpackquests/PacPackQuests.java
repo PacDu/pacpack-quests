@@ -14,6 +14,7 @@ import fr.pacdu.pacpackquests.network.QuestSyncPayload;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -47,7 +48,7 @@ public class PacPackQuests implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Initializing PacPack Quests...");
 		ModConfig.load();
-		QuestManager.registerLoader();
+		ServerLifecycleEvents.SERVER_STARTING.register(server -> QuestManager.loadQuests());
 
 		// S2C (Server to Client) : The server synchronizes the list of quests with the client
 		PayloadTypeRegistry.playS2C().register(QuestSyncPayload.ID, QuestSyncPayload.CODEC);

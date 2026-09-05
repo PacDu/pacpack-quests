@@ -8,95 +8,57 @@ import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
-import fr.pacdu.pacpackquests.config.ModConfig;
 import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.resource.SynchronousResourceReloader;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
-import net.minecraft.resource.Resource;
 import net.minecraft.util.Identifier;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 
 public class QuestManager {
 
-    // Central storage for all loaded quests
     public static final Map<String, QuestDefinition> LOADED_QUESTS = new HashMap<>();
     private static final Gson GSON = new Gson();
     private static final List<String> QUEST_DEFINITION_REQUIDED_LIST = Arrays.asList("title", "type", "target", "requiredAmount", "icon", "reward", "rewardAmount", "displayX",  "displayY");
 
-    public static void registerLoader() {
-        SynchronousResourceReloader questReloader = manager -> {
-            LOADED_QUESTS.clear();
+    public static void loadQuests() {
+        LOADED_QUESTS.clear();
+        Path configDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests");
 
-            // 1. Native loading via Datapacks (files included in the mod or in the world folder)
-            if (ModConfig.loadDefaultQuests) {
-                Map<Identifier, Resource> resources = manager.findResources("quests", path -> path.getPath().endsWith(".json"));
-                for (Map.Entry<Identifier, Resource> entry : resources.entrySet()) {
-                    Identifier fileId = entry.getKey();
-                    try (InputStream stream = entry.getValue().getInputStream();
-                         InputStreamReader reader = new InputStreamReader(stream)) {
-
-                        JsonObject json = GSON.fromJson(reader, JsonObject.class);
-
-                        // Extract relative path after "quests/" (e.g., "quests/nether/blaze.json" -> "nether/blaze.json")
-                        String rawPath = fileId.getPath();
-                        String relativePath = rawPath.substring(7);
-
-                        AssertParseAndAddQuest(relativePath, json);
-                    } catch (Exception e) {
-                        PacPackQuests.LOGGER.error("[PacPackQuests] Failed to load Datapack quest: {}", fileId, e);
-                    }
-                }
-            }
-
-            // 2. Loading via the global Config folder (applies to all worlds)
-            Path configDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests");
-
+        if (!Files.exists(configDir)) {
             try {
-                // Automatically generate directories if they do not exist
-                if (!Files.exists(configDir)) {
-                    Files.createDirectories(configDir);
-                }
-
-                // Iterate through all JSON files in the config directory
-                try (Stream<Path> paths = Files.walk(configDir)) {
-                    paths.filter(Files::isRegularFile)
-                            .filter(path -> path.toString().endsWith(".json"))
-                            .forEach(path -> {
-                                try (InputStreamReader reader = new InputStreamReader(Files.newInputStream(path))) {
-                                    JsonObject json = GSON.fromJson(reader, JsonObject.class);
-
-                                    // Relativize path to get folders (e.g., "C:/.../config/.../nether/blaze.json" -> "nether/blaze.json")
-                                    Path relativePath = configDir.relativize(path);
-                                    String pathStr = relativePath.toString().replace('\\', '/');
-
-                                    // Config quests will overwrite datapack quests if the ID is identical
-                                    AssertParseAndAddQuest(pathStr, json);
-                                } catch (Exception e) {
-                                    PacPackQuests.LOGGER.error("Failed to load Config quest: {}", path.getFileName(), e);
-                                }
-                            });
-                }
+                Files.createDirectories(configDir);
             } catch (Exception e) {
-                PacPackQuests.LOGGER.error("Unable to read the configuration directory.", e);
+                PacPackQuests.LOGGER.error("Failed to create quests directory.", e);
             }
+            return;
+        }
 
-            PacPackQuests.LOGGER.info("Successfully loaded {} quests!", LOADED_QUESTS.size());
-        };
+        try (Stream<Path> paths = Files.walk(configDir)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".json"))
+                    .forEach(path -> {
+                        try (InputStreamReader reader = new InputStreamReader(Files.newInputStream(path))) {
+                            JsonObject json = GSON.fromJson(reader, JsonObject.class);
 
-        ResourceLoader.get(ResourceType.SERVER_DATA).registerReloader(
-                Identifier.of("pacpackquests", "quest_loader"),
-                questReloader
-        );
+                            Path relativePath = configDir.relativize(path);
+                            String pathStr = relativePath.toString().replace('\\', '/');
+
+                            AssertParseAndAddQuest(pathStr, json);
+                        } catch (Exception e) {
+                            PacPackQuests.LOGGER.error("Failed to load Config quest: {}", path.getFileName(), e);
+                        }
+                    });
+        } catch (Exception e) {
+            PacPackQuests.LOGGER.error("Unable to read the configuration directory.", e);
+        }
+
+        PacPackQuests.LOGGER.info("Successfully loaded {} quests!", LOADED_QUESTS.size());
     }
 
     private static void AssertParseAndAddQuest(String filePath, JsonObject json) {
