@@ -282,17 +282,14 @@ public class QuestScreen extends Screen {
 		Text textToDraw;
 		int textColor;
 		if (quest.isLocked()) {
-			textToDraw = Text.translatable("gui.pacpack-quests.locked");
+			textToDraw = Text.literal("???");
 			textColor = 0xFFFF5555;
-		} else if (claimed) {
-			textToDraw = Text.translatable("gui.done");
-			textColor = 0xFF55FF55;
 		} else {
 			textToDraw = Text.literal(progress + "/" + requiredAmount);
 			textColor = progress >= requiredAmount ? 0xFFFFFF55 : 0xFFAAAAAA;
 		}
 
-		context.drawText(this.textRenderer, textToDraw, quest.x() - 2, quest.y() + 22, textColor, true);
+		context.drawCenteredTextWithShadow(this.textRenderer, textToDraw, quest.x() + 8, quest.y() + 22, textColor);
 	}
 
 	private void drawQuestTooltip(DrawContext context, QuestNode quest, int mouseX, int mouseY) {
