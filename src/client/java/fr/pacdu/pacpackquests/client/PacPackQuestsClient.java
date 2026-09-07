@@ -69,6 +69,10 @@ public class PacPackQuestsClient implements ClientModInitializer {
 				CLIENT_PROGRESS.put(payload.questId(), payload.progress());
 				CLIENT_FINISHED.put(payload.questId(), payload.isFinished());
 				CLIENT_CLAIMED.put(payload.questId(), payload.isClaimed());
+
+				if (context.client().currentScreen instanceof QuestScreen questScreen) {
+					questScreen.updateClaimButtonState();
+				}
 			});
 		});
 	}

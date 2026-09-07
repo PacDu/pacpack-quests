@@ -7,7 +7,6 @@ import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
 import fr.pacdu.pacpackquests.network.MoveQuestPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.impl.object.builder.FabricEntityTypeImpl;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
@@ -15,7 +14,6 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.resource.language.I18n;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
@@ -32,6 +30,7 @@ public class QuestScreen extends Screen {
 
 	private final List<String> categories = new ArrayList<>();
 	private static String selectedCategory = "main";
+	private ButtonWidget claimAllButton;
 	private final int tabWidth = 70;
 	private final int tabHeight = 20;
 
@@ -70,12 +69,21 @@ public class QuestScreen extends Screen {
 		int buttonWidth = 100;
 		int buttonHeight = 20;
 
-		// "Done" Button
+		// "Done" Button (Shifted left)
 		this.addDrawableChild(
 				ButtonWidget.builder(Text.translatable("gui.done"), button -> this.close())
-						.dimensions((this.width - buttonWidth) / 2, this.height - 35, buttonWidth, buttonHeight)
+						.dimensions((this.width / 2) - buttonWidth - 5, this.height - 35, buttonWidth, buttonHeight)
 						.build()
 		);
+
+		// "Claim All" Button (Shifted right)
+		this.claimAllButton = ButtonWidget.builder(Text.translatable("gui.pacpack-quests.claim_all"), button -> claimAllQuests())
+				.dimensions((this.width / 2) + 5, this.height - 35, buttonWidth, buttonHeight)
+				.build();
+
+		// Set initial state
+		this.claimAllButton.active = hasClaimableQuests();
+		this.addDrawableChild(this.claimAllButton);
 
 		// "Edit Mode" Toggle Button (Only visible if player is OP)
 		if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().getServer().getPlayerManager().isOperator(MinecraftClient.getInstance().player.getPlayerConfigEntry())) {
@@ -284,6 +292,9 @@ public class QuestScreen extends Screen {
 		if (quest.isLocked()) {
 			textToDraw = Text.literal("???");
 			textColor = 0xFFFF5555;
+		} else if (claimed) {
+			textToDraw = Text.literal(progress + "/" + requiredAmount);
+			textColor = 0xFF55FF55;
 		} else {
 			textToDraw = Text.literal(progress + "/" + requiredAmount);
 			textColor = progress >= requiredAmount ? 0xFFFFFF55 : 0xFFAAAAAA;
@@ -333,13 +344,27 @@ public class QuestScreen extends Screen {
 		int cx = child.x() + 8;
 		int cy = child.y() + 8;
 
-		// If either node is being dragged, visually disconnect the lines to avoid messy rendering, or draw to mouse
+		// If either node is being dragged, visually disconnect the lines to avoid messy rendering
 		if (parent.id().equals(draggedQuestId) || child.id().equals(draggedQuestId)) return;
 
 		int lineColor = child.isLocked() ? 0xFF444444 : 0xFF88AA88;
 		int thickness = 2;
-		context.fill(Math.min(px, cx), py - thickness/2, Math.max(px, cx) + thickness/2, py + thickness/2, lineColor);
-		context.fill(cx - thickness/2, Math.min(py, cy), cx + thickness/2, Math.max(py, cy) + thickness/2, lineColor);
+
+		// Calculate distance and angle between the two points
+		float dx = cx - px;
+		float dy = cy - py;
+		float length = (float) Math.sqrt(dx * dx + dy * dy);
+		float angle = (float) Math.atan2(dy, dx);
+
+		// Apply rotation and translation to draw a straight line
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate((float) px, (float) py);
+		context.getMatrices().rotate(angle);
+
+		// Draw the rectangle starting from 0,0 along the new rotated X axis
+		context.fill(0, -thickness / 2, (int) length, thickness / 2, lineColor);
+
+		context.getMatrices().popMatrix();
 	}
 
 	private QuestNode getQuestById(String id) {
@@ -541,5 +566,64 @@ public class QuestScreen extends Screen {
 		// Apply the limits safely
 		panX = Math.clamp(panX, minPanX, maxPanX);
 		panY = Math.clamp(panY, minPanY, maxPanY);
+	}
+
+	private void claimAllQuests() {
+		for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
+			int currentProg = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+			int requiredAmount = quest.requiredAmount();
+			boolean isClaimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
+
+			// Check if quest is ready to be claimed
+			if (currentProg >= requiredAmount && !isClaimed) {
+
+				// Verify lock status to prevent sending useless packets
+				boolean isLocked = false;
+				if (quest.parents() != null) {
+					for (String parentId : quest.parents()) {
+						if (!PacPackQuestsClient.CLIENT_FINISHED.getOrDefault(parentId, false)) {
+							isLocked = true;
+							break;
+						}
+					}
+				}
+
+				// Send standard claim payload if unlocked
+				if (!isLocked) {
+					ClientPlayNetworking.send(new ClaimQuestPayload(quest.id()));
+				}
+			}
+		}
+		this.claimAllButton.active = false;
+	}
+
+	private boolean hasClaimableQuests() {
+		for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
+			int currentProg = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+			int requiredAmount = quest.requiredAmount();
+			boolean isClaimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
+
+			if (currentProg >= requiredAmount && !isClaimed) {
+				boolean isLocked = false;
+				if (quest.parents() != null) {
+					for (String parentId : quest.parents()) {
+						if (!PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(parentId, false)) {
+							isLocked = true;
+							break;
+						}
+					}
+				}
+				if (!isLocked) {
+					return true; // Found at least one quest ready to be claimed
+				}
+			}
+		}
+		return false; // No quests ready
+	}
+
+	public void updateClaimButtonState() {
+		if (this.claimAllButton != null) {
+			this.claimAllButton.active = hasClaimableQuests();
+		}
 	}
 }
