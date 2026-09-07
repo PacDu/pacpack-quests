@@ -2,6 +2,7 @@ package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.QuestProgressPayload;
 import fr.pacdu.pacpackquests.network.QuestSyncPayload;
 import net.fabricmc.api.ClientModInitializer;
@@ -60,6 +61,8 @@ public class PacPackQuestsClient implements ClientModInitializer {
 						payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
 				);
 				CLIENT_DEFINITIONS.put(payload.questId(), def);
+
+				if (context.client().currentScreen instanceof QuestScreen qs) qs.refreshUI();
 			});
 		});
 
@@ -72,6 +75,19 @@ public class PacPackQuestsClient implements ClientModInitializer {
 
 				if (context.client().currentScreen instanceof QuestScreen questScreen) {
 					questScreen.updateClaimButtonState();
+				}
+			});
+		});
+
+		ClientPlayNetworking.registerGlobalReceiver(DeleteQuestPayload.ID, (payload, context) -> {
+			context.client().execute(() -> {
+				CLIENT_DEFINITIONS.remove(payload.questId());
+				CLIENT_PROGRESS.remove(payload.questId());
+				CLIENT_FINISHED.remove(payload.questId());
+				CLIENT_CLAIMED.remove(payload.questId());
+
+				if (context.client().currentScreen instanceof QuestScreen questScreen) {
+					questScreen.refreshUI();
 				}
 			});
 		});

@@ -49,7 +49,7 @@ public class QuestScreen extends Screen {
 	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) {}
 
 	public QuestScreen() {
-		super(Text.translatable("gui.pacpack-quests.title"));
+		super(Text.translatable("gui.pacpack-quests.quest_menu"));
 	}
 
 	@Override
@@ -393,13 +393,15 @@ public class QuestScreen extends Screen {
 			} else if (click.button() == 1) { // Right Click: Open Edit/Delete Menu
 				for (QuestNode quest : questList) {
 					if (isHovering(quest, localMouseX, localMouseY)) {
-						// TODO: Implement Edit/Delete screen opening here
-						// MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, quest.id()));
+						// Edit existing quest
+						MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, quest.id(), selectedCategory, quest.displayX(), quest.displayY()));
 						return true;
 					}
 				}
-				// If right-clicked empty space, add a new quest
-				// ClientPlayNetworking.send(new CreateQuestPayload(selectedCategory, localMouseX, localMouseY));
+				// Create new quest on empty space
+				int gridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
+				int gridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
+				MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, gridX, gridY));
 				return true;
 			}
 		}
@@ -625,5 +627,9 @@ public class QuestScreen extends Screen {
 		if (this.claimAllButton != null) {
 			this.claimAllButton.active = hasClaimableQuests();
 		}
+	}
+
+	public void refreshUI() {
+		this.clearAndInit();
 	}
 }

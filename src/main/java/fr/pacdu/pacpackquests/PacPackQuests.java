@@ -7,10 +7,7 @@ import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestProgressHandler;
 import fr.pacdu.pacpackquests.data.QuestState;
-import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
-import fr.pacdu.pacpackquests.network.MoveQuestPayload;
-import fr.pacdu.pacpackquests.network.QuestProgressPayload;
-import fr.pacdu.pacpackquests.network.QuestSyncPayload;
+import fr.pacdu.pacpackquests.network.*;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
@@ -50,15 +47,16 @@ public class PacPackQuests implements ModInitializer {
 		ModConfig.load();
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> QuestManager.loadQuests());
 
-		// S2C (Server to Client) : The server synchronizes the list of quests with the client
 		PayloadTypeRegistry.playS2C().register(QuestSyncPayload.ID, QuestSyncPayload.CODEC);
-		// S2C (Server to Client) : The server updates the client's visual progress
 		PayloadTypeRegistry.playS2C().register(QuestProgressPayload.ID, QuestProgressPayload.CODEC);
-		// C2S (Client to Server) : The client requests to claim their reward
+		PayloadTypeRegistry.playS2C().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
+
 		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(SaveQuestPayload.ID, SaveQuestPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
 
-		// 1. Connection Event: Sync all quests progress when a player joins
+		// Connection Event: Sync all quests progress when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			ServerPlayerEntity player = handler.player;
 			QuestState state = QuestState.getServerState(server);
@@ -92,7 +90,59 @@ public class PacPackQuests implements ModInitializer {
 			}
 		});
 
-		// 2. Claim Event: Listen to reward claim requests
+		PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
+			if (!world.isClient()) {
+				// We retrieve our save manager
+				QuestState questState = QuestState.getServerState(world.getServer());
+				UUID playerId = player.getUuid();
+
+				// Iterate through all dynamically loaded quests
+				for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+					if (quest.type() == TaskType.MINE_BLOCK) {
+						boolean isTarget = false;
+						String target = quest.target();
+
+						if (target.startsWith("#")) {
+							TagKey<Block> tag = TagKey.of(RegistryKeys.BLOCK, Identifier.of(target.substring(1)));
+							isTarget = state.isIn(tag);
+						} else {
+							isTarget = Registries.BLOCK.getId(state.getBlock()).toString().equals(target);
+						}
+
+						if (isTarget) {
+							QuestProgressHandler.incrementProgress((ServerPlayerEntity) player, quest, 1);
+						}
+					}
+				}
+			}
+		});
+
+		ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity, damageSource) -> {
+			if (entity instanceof ServerPlayerEntity player) {
+
+				for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+					if (quest.type() == TaskType.KILL_MOB) {
+						boolean isTarget = false;
+						String target = quest.target();
+
+						// Check tags (e.g., "#minecraft:skeletons") or direct IDs
+						if (target.startsWith("#")) {
+							TagKey<EntityType<?>> tag = TagKey.of(RegistryKeys.ENTITY_TYPE, Identifier.of(target.substring(1)));
+							isTarget = killedEntity.getType().isIn(tag);
+						} else {
+							isTarget = Registries.ENTITY_TYPE.getId(killedEntity.getType()).toString().equals(target);
+						}
+
+						if (isTarget) {
+							// Always increment by 1 for a single kill
+							QuestProgressHandler.incrementProgress(player, quest, 1);
+						}
+					}
+				}
+			}
+		});
+
+		// Claim Event: Listen to reward claim requests
 		ServerPlayNetworking.registerGlobalReceiver(ClaimQuestPayload.ID, (payload, context) -> {
 			context.server().execute(() -> {
 				QuestState questState = QuestState.getServerState(context.server());
@@ -195,58 +245,80 @@ public class PacPackQuests implements ModInitializer {
 			});
 		});
 
-		// The event is listened every time a block is broken
-		PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
-			if (!world.isClient()) {
-				// We retrieve our save manager
-				QuestState questState = QuestState.getServerState(world.getServer());
-				UUID playerId = player.getUuid();
+		ServerPlayNetworking.registerGlobalReceiver(SaveQuestPayload.ID, (payload, context) -> {
+			context.server().execute(() -> {
+				if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
-				// Iterate through all dynamically loaded quests
-				for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-					if (quest.type() == TaskType.MINE_BLOCK) {
-						boolean isTarget = false;
-						String target = quest.target();
+				Path categoryDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + payload.category());
+				try { Files.createDirectories(categoryDir); } catch (Exception ignored) {}
 
-						if (target.startsWith("#")) {
-							TagKey<Block> tag = TagKey.of(RegistryKeys.BLOCK, Identifier.of(target.substring(1)));
-							isTarget = state.isIn(tag);
-						} else {
-							isTarget = Registries.BLOCK.getId(state.getBlock()).toString().equals(target);
-						}
+				Path questFile = categoryDir.resolve(payload.questId() + ".json");
 
-						if (isTarget) {
-							QuestProgressHandler.incrementProgress((ServerPlayerEntity) player, quest, 1);
-						}
-					}
+				JsonObject json = new JsonObject();
+				json.addProperty("title", payload.title());
+				json.addProperty("type", payload.type().toString());
+				json.addProperty("target", payload.target());
+				json.addProperty("requiredAmount", payload.requiredAmount());
+				json.addProperty("icon", payload.iconId());
+
+				switch (payload.rewardType()) {
+					case XP -> json.addProperty("reward", "xp");
+					case LEVEL -> json.addProperty("reward", "level");
+					case ITEM -> json.addProperty("reward", payload.rewardId());
 				}
-			}
+				json.addProperty("rewardAmount", payload.rewardAmount());
+
+				if (payload.parents() != null && !payload.parents().isEmpty()) {
+					json.add("parents", GSON.toJsonTree(payload.parents()));
+				}
+
+				json.addProperty("displayX", payload.displayX());
+				json.addProperty("displayY", payload.displayY());
+
+				try {
+					Files.writeString(questFile, GSON.toJson(json));
+
+					// Mise à jour de la mémoire serveur
+					QuestDefinition newDef = new QuestDefinition(
+							payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
+							payload.requiredAmount(), new ItemStack(Registries.ITEM.get(Identifier.of(payload.iconId()))),
+							new ItemStack(Registries.ITEM.get(Identifier.of(payload.rewardId()))), payload.rewardType(),
+							payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
+					);
+					QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
+
+					// Synchronisation aux joueurs
+					QuestSyncPayload syncPacket = new QuestSyncPayload(
+							payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
+							payload.requiredAmount(), payload.iconId(), payload.rewardId(), payload.rewardType(),
+							payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
+					);
+					context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));
+
+				} catch (Exception e) {
+					PacPackQuests.LOGGER.error("Failed to save quest", e);
+				}
+			});
 		});
 
-		// Listen to combat events
-		ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity, damageSource) -> {
-			if (entity instanceof ServerPlayerEntity player) {
+		ServerPlayNetworking.registerGlobalReceiver(DeleteQuestPayload.ID, (payload, context) -> {
+			context.server().execute(() -> {
+				if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
-				for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-					if (quest.type() == TaskType.KILL_MOB) {
-						boolean isTarget = false;
-						String target = quest.target();
+				QuestDefinition def = QuestManager.LOADED_QUESTS.get(payload.questId());
+				if (def != null) {
+					Path questFile = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + def.category() + "/" + payload.questId() + ".json");
+					try {
+						Files.deleteIfExists(questFile);
+						QuestManager.LOADED_QUESTS.remove(payload.questId());
 
-						// Check tags (e.g., "#minecraft:skeletons") or direct IDs
-						if (target.startsWith("#")) {
-							TagKey<EntityType<?>> tag = TagKey.of(RegistryKeys.ENTITY_TYPE, Identifier.of(target.substring(1)));
-							isTarget = killedEntity.getType().isIn(tag);
-						} else {
-							isTarget = Registries.ENTITY_TYPE.getId(killedEntity.getType()).toString().equals(target);
-						}
-
-						if (isTarget) {
-							// Always increment by 1 for a single kill
-							QuestProgressHandler.incrementProgress(player, quest, 1);
-						}
+						// Prévenir les clients de l'effacer
+						context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new DeleteQuestPayload(payload.questId())));
+					} catch (Exception e) {
+						PacPackQuests.LOGGER.error("Failed to delete quest", e);
 					}
 				}
-			}
+			});
 		});
 	}
 }
