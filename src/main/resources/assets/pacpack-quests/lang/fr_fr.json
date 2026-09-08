@@ -23,6 +23,8 @@
   "gui.pacpack-quests.save": "Sauvegarder",
   "gui.pacpack-quests.delete": "Supprimer",
   "gui.pacpack-quests.cancel": "Annuler",
+  "gui.pacpack-quests.delete_category_title": "Supprimer la Catégorie ?",
+  "gui.pacpack-quests.delete_category_desc": "Êtes-vous sûr de vouloir supprimer toutes les quêtes dans",
 
   "form.pacpack-quests.quest_id": "ID de la Quête",
   "form.pacpack-quests.quest_id_placeholder": "ex: ma_premiere_quete",

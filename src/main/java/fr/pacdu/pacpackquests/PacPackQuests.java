@@ -51,12 +51,14 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(QuestProgressPayload.ID, QuestProgressPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
 
 		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(SaveQuestPayload.ID, SaveQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
 
 		// Connection Event: Sync all quests progress when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -94,14 +96,10 @@ public class PacPackQuests implements ModInitializer {
 
 		PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
 			if (!world.isClient()) {
-				// We retrieve our save manager
-				QuestState questState = QuestState.getServerState(world.getServer());
-				UUID playerId = player.getUuid();
-
 				// Iterate through all dynamically loaded quests
 				for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
 					if (quest.type() == TaskType.MINE_BLOCK) {
-						boolean isTarget = false;
+						boolean isTarget;
 						String target = quest.target();
 
 						if (target.startsWith("#")) {
@@ -335,6 +333,37 @@ public class PacPackQuests implements ModInitializer {
 					context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new CreateCategoryPayload(payload.category())));
 				} catch (Exception e) {
 					PacPackQuests.LOGGER.error("Failed to create category folder", e);
+				}
+			});
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> {
+			context.server().execute(() -> {
+				if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
+
+				String categoryToDelete = payload.category();
+				Path categoryDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + categoryToDelete);
+
+				try {
+					// 1. Supprimer le dossier et tout son contenu (les quêtes)
+					java.io.File dir = categoryDir.toFile();
+					if (dir.exists()) {
+						java.io.File[] files = dir.listFiles();
+						if (files != null) {
+							for (java.io.File file : files) file.delete();
+						}
+						dir.delete();
+					}
+
+					// 2. Nettoyer la mémoire vive du serveur
+					QuestManager.LOADED_QUESTS.values().removeIf(quest -> quest.category().equals(categoryToDelete));
+
+					// 3. Informer tous les joueurs connectés de la suppression
+					DeleteCategoryPayload syncPayload = new DeleteCategoryPayload(categoryToDelete);
+					context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPayload));
+
+				} catch (Exception e) {
+					PacPackQuests.LOGGER.error("Failed to delete category folder", e);
 				}
 			});
 		});

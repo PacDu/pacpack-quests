@@ -2,10 +2,7 @@ package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.config.ModConfig;
-import fr.pacdu.pacpackquests.network.CreateCategoryPayload;
-import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
-import fr.pacdu.pacpackquests.network.QuestProgressPayload;
-import fr.pacdu.pacpackquests.network.QuestSyncPayload;
+import fr.pacdu.pacpackquests.network.*;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -127,6 +124,17 @@ public class PacPackQuestsClient implements ClientModInitializer {
 			context.client().execute(() -> {
 				if (!CLIENT_CATEGORIES.contains(payload.category())) {
 					CLIENT_CATEGORIES.add(payload.category());
+				}
+			});
+		});
+
+		ClientPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> {
+			context.client().execute(() -> {
+				// Supprime de la mémoire toutes les quêtes liées à cette catégorie
+				CLIENT_DEFINITIONS.entrySet().removeIf(entry -> entry.getValue().category().equals(payload.category()));
+
+				if (context.client().currentScreen instanceof QuestScreen questScreen) {
+					questScreen.removeCategory(payload.category());
 				}
 			});
 		});

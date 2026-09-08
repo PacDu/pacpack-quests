@@ -6,6 +6,7 @@ import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
 import fr.pacdu.pacpackquests.network.CreateCategoryPayload;
+import fr.pacdu.pacpackquests.network.DeleteCategoryPayload;
 import fr.pacdu.pacpackquests.network.MoveQuestPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
@@ -109,7 +110,7 @@ public class QuestScreen extends Screen {
 		this.addDrawableChild(this.inlineCategoryField);
 
 		if (CLIENT_CATEGORIES.isEmpty()) {
-			CLIENT_CATEGORIES.add("overworld");
+			CLIENT_CATEGORIES.add("main");
 		}
 
 		// Update selectedCategory if the previous one no longer exists
@@ -169,6 +170,13 @@ public class QuestScreen extends Screen {
 
 			context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, color);
 			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
+
+			if (isEditMode) {
+				int delBtnX = tabX + tabWidth - 14;
+				int delBtnY = currentTabY + 4;
+				context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, 0xFF991111);
+				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, 0xFFFFFFFF);
+			}
 
 			currentTabY += tabHeight + 5;
 		}
@@ -382,6 +390,27 @@ public class QuestScreen extends Screen {
 			int currentTabY = startY + 20;
 			for (String category : CLIENT_CATEGORIES) {
 				int tabX = startX - tabWidth;
+
+				// 1. Intercept the click on the delete button (red cross)
+				if (isEditMode) {
+					int delBtnX = tabX + tabWidth - 14;
+					int delBtnY = currentTabY + 4;
+					if (mouseX >= delBtnX && mouseX <= delBtnX + 10 && mouseY >= delBtnY && mouseY <= delBtnY + 10) {
+						this.client.setScreen(new net.minecraft.client.gui.screen.ConfirmScreen(
+								confirmed -> {
+									if (confirmed) {
+										ClientPlayNetworking.send(new DeleteCategoryPayload(category));
+									}
+									this.client.setScreen(this); // Retour au menu des quêtes
+								},
+								Text.translatable("gui.pacpack-quests.delete_category_title"),
+								Text.translatable("gui.pacpack-quests.delete_category_desc").append(" " + category.toUpperCase() + " ?")
+						));
+						return true;
+					}
+				}
+
+				// 2. Normal click to change category
 				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= currentTabY && mouseY <= currentTabY + tabHeight) {
 					selectedCategory = category;
 					refreshQuests();
@@ -666,6 +695,16 @@ public class QuestScreen extends Screen {
 		}
 		selectedCategory = categoryName;
 		refreshQuests();
+	}
+
+	public void removeCategory(String categoryName) {
+		CLIENT_CATEGORIES.remove(categoryName);
+
+		// If the deleted category was the one open, we switch to another one
+		if (selectedCategory.equals(categoryName)) {
+			selectedCategory = CLIENT_CATEGORIES.isEmpty() ? "main" : CLIENT_CATEGORIES.getFirst();
+		}
+		this.refreshUI();
 	}
 
 	public void refreshUI() {
