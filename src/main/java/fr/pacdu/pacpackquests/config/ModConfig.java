@@ -19,7 +19,7 @@ public class ModConfig {
 
     // Default value
     public static boolean loadDefaultQuests = true;
-    public static List<String> categoryOrder =  Arrays.asList("overworld", "nether");
+    public static List<String> categoryOrder = new ArrayList<>();
 
     public static void load() {
         try {
