@@ -24,7 +24,7 @@ public class EditQuestScreen extends Screen {
     private final String category;
     private final int gridX, gridY;
 
-    private TextFieldWidget idField, titleField, targetField, reqAmountField, iconField, rewardIdField, rewardAmountField, parentsField;
+    private TextFieldWidget idField, titleField, targetField, reqAmountField, iconField, rewardField, rewardAmountField, parentsField;
     private TaskType currentTaskType = TaskType.MINE_BLOCK;
     private RewardType currentRewardType = RewardType.ITEM;
 
@@ -74,27 +74,33 @@ public class EditQuestScreen extends Screen {
 
         // ROW 3: Req Amount & Icon
         y += yStep - 10;
-        this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.task") + ": " + currentTaskType.name()), button -> {
+        this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + currentTaskType.name()), button -> {
             int nextOrdinal = (currentTaskType.ordinal() + 1) % TaskType.values().length;
             currentTaskType = TaskType.values()[nextOrdinal];
-            button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task") + ": " + currentTaskType.name()));
+            button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + currentTaskType.name()));
+            switch(currentTaskType) {
+                case MINE_BLOCK -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_mine"));
+                case CRAFT_ITEM -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_craft"));
+                case KILL_MOB -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_kill"));
+            }
         }).dimensions(col1, y, fieldWidth, 20).build());
 
-        this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.reward") + ": " + currentRewardType.name()), button -> {
+        this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + currentRewardType.name()), button -> {
             int nextOrdinal = (currentRewardType.ordinal() + 1) % RewardType.values().length;
             currentRewardType = RewardType.values()[nextOrdinal];
-            button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.reward") + ": " + currentRewardType.name()));
+            button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + currentRewardType.name()));
+            this.rewardField.setVisible(currentRewardType == RewardType.ITEM);
         }).dimensions(col2, y, fieldWidth, 20).build());
 
         // ROW 4: Reward Type & Target
         y += yStep;
         this.targetField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.task_target"));
-        this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder"));
+        this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_mine"));
         this.addDrawableChild(this.targetField);
 
-        this.rewardIdField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.reward_target"));
-        this.rewardIdField.setPlaceholder(Text.translatable("form.pacpack-quests.reward_target_placeholder"));
-        this.addDrawableChild(this.rewardIdField);
+        this.rewardField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.reward_item"));
+        this.rewardField.setPlaceholder(Text.translatable("form.pacpack-quests.reward_item_placeholder"));
+        this.addDrawableChild(this.rewardField);
 
         // ROW 5: Reward Amount & Parents
         y += yStep;
@@ -115,7 +121,7 @@ public class EditQuestScreen extends Screen {
             this.reqAmountField.setText(String.valueOf(def.requiredAmount()));
             this.iconField.setText(Registries.ITEM.getId(def.icon().getItem()).toString());
             this.currentRewardType = def.rewardType();
-            this.rewardIdField.setText(Registries.ITEM.getId(def.reward().getItem()).toString());
+            this.rewardField.setText(Registries.ITEM.getId(def.reward().getItem()).toString());
             this.rewardAmountField.setText(String.valueOf(def.rewardAmount()));
             if (def.parents() != null) {
                 this.parentsField.setText(String.join(",", def.parents()));
@@ -156,7 +162,7 @@ public class EditQuestScreen extends Screen {
             SaveQuestPayload payload = new SaveQuestPayload(
                     finalId, this.titleField.getText().trim(), this.category,
                     this.currentTaskType, this.targetField.getText().trim(), reqAmt,
-                    this.iconField.getText().trim(), this.rewardIdField.getText().trim(),
+                    this.iconField.getText().trim(), this.rewardField.getText().trim(),
                     this.currentRewardType, rewAmt, parentsList, this.gridX, this.gridY
             );
 
@@ -184,7 +190,8 @@ public class EditQuestScreen extends Screen {
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.required_amount"), this.reqAmountField.getX(), this.reqAmountField.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.icon_item_id"), this.iconField.getX(), this.iconField.getY() - 10, 0xFFFFFFFF, true);
 
-        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_target"), this.rewardIdField.getX(), this.rewardIdField.getY() - 10, 0xFFFFFFFF, true);
+        if (this.currentRewardType == RewardType.ITEM)
+            context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_item"), this.rewardField.getX(), this.rewardField.getY() - 10, 0xFFFFFFFF, true);
 
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_amount"), this.rewardAmountField.getX(), this.rewardAmountField.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.parents"), this.parentsField.getX(), this.parentsField.getY() - 10, 0xFFFFFFFF, true);
