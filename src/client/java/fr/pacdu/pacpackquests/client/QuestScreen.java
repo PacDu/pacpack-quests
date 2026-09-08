@@ -468,9 +468,6 @@ public class QuestScreen extends Screen {
 			int dropGridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
 			int dropGridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
 
-			// Send packet to server to permanently save new position
-			// ClientPlayNetworking.send(new MoveQuestPayload(draggedQuestId, dropGridX, dropGridY));
-
 			// 1. Send the new coordinates to the server
 			ClientPlayNetworking.send(new MoveQuestPayload(draggedQuestId, dropGridX, dropGridY));
 
@@ -562,8 +559,11 @@ public class QuestScreen extends Screen {
 		double maxPanY = 0;
 
 		// We multiply by zoom because the physical size of the canvas changes as we zoom in/out.
-		double minPanX = -(canvasPixelWidth * zoom);
-		double minPanY = -(canvasPixelHeight * zoom);
+		double minPanX = -(canvasPixelWidth * zoom) + windowWidth;
+		double minPanY = -(canvasPixelHeight * zoom) +  windowHeight;
+
+		minPanX = Math.clamp(minPanX, -windowWidth, maxPanX);
+		minPanY = Math.clamp(minPanY, -windowHeight, maxPanY);
 
 		// Apply the limits safely
 		panX = Math.clamp(panX, minPanX, maxPanX);
