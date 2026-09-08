@@ -1,7 +1,8 @@
 package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
-import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.config.ModConfig;
+import fr.pacdu.pacpackquests.network.CreateCategoryPayload;
 import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.QuestProgressPayload;
 import fr.pacdu.pacpackquests.network.QuestSyncPayload;
@@ -17,7 +18,9 @@ import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class PacPackQuestsClient implements ClientModInitializer {
@@ -28,8 +31,9 @@ public class PacPackQuestsClient implements ClientModInitializer {
 	public static final Map<String, Integer> CLIENT_PROGRESS = new HashMap<>();
 	public static final Map<String, Boolean> CLIENT_FINISHED = new HashMap<>();
 	public static final Map<String, Boolean> CLIENT_CLAIMED = new HashMap<>();
+	public static final List<String> CLIENT_CATEGORIES = new ArrayList<>();
 
-	public static final KeyBinding.Category QUEST_CATEGORY = KeyBinding.Category.create(Identifier.of("pacpack-quests", "keys"));
+	public static final KeyBinding.Category QUEST_CATEGORY_KEY = KeyBinding.Category.create(Identifier.of("pacpack-quests", "keys"));
 
 	@Override
 	public void onInitializeClient() {
@@ -37,7 +41,7 @@ public class PacPackQuestsClient implements ClientModInitializer {
 				"key.pacpack-quests.open-quest-menu",
 				InputUtil.Type.KEYSYM,
 				GLFW.GLFW_KEY_O,
-				QUEST_CATEGORY
+				QUEST_CATEGORY_KEY
 		));
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -61,6 +65,33 @@ public class PacPackQuestsClient implements ClientModInitializer {
 						payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
 				);
 				CLIENT_DEFINITIONS.put(payload.questId(), def);
+
+				for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
+					if (!CLIENT_CATEGORIES.contains(quest.category())) {
+						CLIENT_CATEGORIES.add(quest.category());
+					}
+				}
+
+				// --- CONFIG-BASED SORTING ---
+				// Replace ModConfig.categoryOrder with the actual variable from your config file
+				List<String> configuredOrder = ModConfig.categoryOrder;
+
+				CLIENT_CATEGORIES.sort((cat1, cat2) -> {
+					int index1 = configuredOrder.indexOf(cat1);
+					int index2 = configuredOrder.indexOf(cat2);
+
+					// Both categories are missing from the config -> Sort them alphabetically at the end
+					if (index1 == -1 && index2 == -1) return cat1.compareTo(cat2);
+
+					// Only cat1 is missing -> Push it to the bottom
+					if (index1 == -1) return 1;
+
+					// Only cat2 is missing -> Push it to the bottom
+					if (index2 == -1) return -1;
+
+					// Both are in the config -> Sort them according to the configured order
+					return Integer.compare(index1, index2);
+				});
 
 				if (context.client().currentScreen instanceof QuestScreen qs) qs.refreshUI();
 			});
@@ -88,6 +119,14 @@ public class PacPackQuestsClient implements ClientModInitializer {
 
 				if (context.client().currentScreen instanceof QuestScreen questScreen) {
 					questScreen.refreshUI();
+				}
+			});
+		});
+
+		ClientPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.ID, (payload, context) -> {
+			context.client().execute(() -> {
+				if (!CLIENT_CATEGORIES.contains(payload.category())) {
+					CLIENT_CATEGORIES.add(payload.category());
 				}
 			});
 		});

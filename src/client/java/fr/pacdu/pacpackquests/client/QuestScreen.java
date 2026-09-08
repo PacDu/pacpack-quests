@@ -5,6 +5,7 @@ import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
+import fr.pacdu.pacpackquests.network.CreateCategoryPayload;
 import fr.pacdu.pacpackquests.network.MoveQuestPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
@@ -12,6 +13,7 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.resource.language.I18n;
 import net.minecraft.item.ItemStack;
@@ -23,16 +25,19 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
+import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.*;
+
 public class QuestScreen extends Screen {
 
 	private int windowWidth, windowHeight, startX, startY;
 	private final List<QuestNode> questList = new ArrayList<>();
 
-	private final List<String> categories = new ArrayList<>();
 	private static String selectedCategory = "main";
-	private ButtonWidget claimAllButton;
 	private final int tabWidth = 70;
 	private final int tabHeight = 20;
+
+	private ButtonWidget claimAllButton;
+	private TextFieldWidget inlineCategoryField;
 
 	// --- Camera & Canvas System ---
 	private double panX = 0;
@@ -98,41 +103,18 @@ public class QuestScreen extends Screen {
 		}
 
 		// --- Categories Setup ---
-		categories.clear();
-		for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
-			if (!categories.contains(quest.category())) {
-				categories.add(quest.category());
-			}
+		this.inlineCategoryField = new TextFieldWidget(this.textRenderer, startX - tabWidth, 0, tabWidth, tabHeight, Text.empty());
+		this.inlineCategoryField.setMaxLength(15);
+		this.inlineCategoryField.setVisible(false);
+		this.addDrawableChild(this.inlineCategoryField);
+
+		if (CLIENT_CATEGORIES.isEmpty()) {
+			CLIENT_CATEGORIES.add("overworld");
 		}
-
-		if (categories.isEmpty()) {
-			categories.add("overworld");
-		}
-
-		// --- CONFIG-BASED SORTING ---
-		// Replace ModConfig.categoryOrder with the actual variable from your config file
-		List<String> configuredOrder = ModConfig.categoryOrder;
-
-		categories.sort((cat1, cat2) -> {
-			int index1 = configuredOrder.indexOf(cat1);
-			int index2 = configuredOrder.indexOf(cat2);
-
-			// Both categories are missing from the config -> Sort them alphabetically at the end
-			if (index1 == -1 && index2 == -1) return cat1.compareTo(cat2);
-
-			// Only cat1 is missing -> Push it to the bottom
-			if (index1 == -1) return 1;
-
-			// Only cat2 is missing -> Push it to the bottom
-			if (index2 == -1) return -1;
-
-			// Both are in the config -> Sort them according to the configured order
-			return Integer.compare(index1, index2);
-		});
 
 		// Update selectedCategory if the previous one no longer exists
-		if (!categories.contains(selectedCategory)) {
-			selectedCategory = categories.getFirst();
+		if (!CLIENT_CATEGORIES.contains(selectedCategory)) {
+			selectedCategory = CLIENT_CATEGORIES.getFirst();
 		}
 
 		refreshQuests();
@@ -146,7 +128,7 @@ public class QuestScreen extends Screen {
 		panY = 0;
 		zoom = 1.0f;
 
-		for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
+		for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
 			if (quest.category().equals(selectedCategory)) {
 
 				int localX = canvasOffsetX + (quest.displayX() * gridSpacing);
@@ -155,7 +137,7 @@ public class QuestScreen extends Screen {
 				boolean locked = false;
 				if (quest.parents() != null) {
 					for (String parentId : quest.parents()) {
-						if (!PacPackQuestsClient.CLIENT_FINISHED.getOrDefault(parentId, false)) {
+						if (!CLIENT_FINISHED.getOrDefault(parentId, false)) {
 							locked = true;
 							break;
 						}
@@ -178,8 +160,9 @@ public class QuestScreen extends Screen {
 		context.fill(startX, startY, startX + windowWidth, startY + windowHeight, 0xAA000000);
 		context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, startY - 18, -1);
 
+		// --- DRAW CATEGORIES ---
 		int currentTabY = startY + 20;
-		for (String category : categories) {
+		for (String category : CLIENT_CATEGORIES) {
 			boolean isSelected = category.equals(selectedCategory);
 			int color = isSelected ? 0xFF666666 : 0xFF333333;
 			int tabX = startX - tabWidth;
@@ -188,6 +171,18 @@ public class QuestScreen extends Screen {
 			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
 
 			currentTabY += tabHeight + 5;
+		}
+
+		// --- ADD CATEGORY BUTTON / INLINE FIELD ---
+		if (isEditMode) {
+			int tabX = startX - tabWidth;
+			if (!this.inlineCategoryField.isVisible()) {
+				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, 0xFF444444);
+				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("+").formatted(Formatting.GRAY, Formatting.BOLD), tabX + tabWidth / 2, currentTabY + 6, 0xFFFFFFFF);
+			} else {
+				this.inlineCategoryField.setX(tabX);
+				this.inlineCategoryField.setY(currentTabY);
+			}
 		}
 
 		double localMouseX = (mouseX - startX - panX) / zoom;
@@ -270,9 +265,9 @@ public class QuestScreen extends Screen {
 	}
 
 	private void renderNode(DrawContext context, QuestNode quest, double localMouseX, double localMouseY, boolean checkHover) {
-		int progress = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
-		int requiredAmount = PacPackQuestsClient.CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
-		boolean claimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
+		int progress = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+		int requiredAmount = CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
+		boolean claimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
 		int bgColor = 0xFF333333;
 		if (quest.isLocked()) bgColor = 0xFF221111;
@@ -304,9 +299,9 @@ public class QuestScreen extends Screen {
 	}
 
 	private void drawQuestTooltip(DrawContext context, QuestNode quest, int mouseX, int mouseY) {
-		int progress = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
-		int requiredAmount = PacPackQuestsClient.CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
-		boolean claimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
+		int progress = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+		int requiredAmount = CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
+		boolean claimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
 		List<Text> tooltip = new ArrayList<>();
 		tooltip.add(Text.translatable(quest.title()).formatted(Formatting.GOLD, Formatting.BOLD));
@@ -382,6 +377,35 @@ public class QuestScreen extends Screen {
 		double localMouseY = (mouseY - startY - panY) / zoom;
 		boolean isMouseInWindow = mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight;
 
+		if (click.button() == 0) { // Left Click
+			// Category tabs selection
+			int currentTabY = startY + 20;
+			for (String category : CLIENT_CATEGORIES) {
+				int tabX = startX - tabWidth;
+				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= currentTabY && mouseY <= currentTabY + tabHeight) {
+					selectedCategory = category;
+					refreshQuests();
+					return true;
+				}
+				currentTabY += tabHeight + 5;
+			}
+
+			// + category tab button
+			if (isEditMode && !this.inlineCategoryField.isVisible()) {
+				int tabX = startX - tabWidth;
+				int plusButtonY = startY + 20 + CLIENT_CATEGORIES.size() * (tabHeight + 5);
+
+				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= plusButtonY && mouseY <= plusButtonY + tabHeight) {
+					this.inlineCategoryField.setX(tabX);
+					this.inlineCategoryField.setY(plusButtonY);
+					this.inlineCategoryField.setVisible(true);
+					this.setFocused(this.inlineCategoryField);
+					this.inlineCategoryField.setFocused(true);
+					return true;
+				}
+			}
+		}
+
 		if (isEditMode && isMouseInWindow) {
 			if (click.button() == 0) { // Left Click: Pick up node to drag
 				for (QuestNode quest : questList) {
@@ -406,27 +430,16 @@ public class QuestScreen extends Screen {
 			}
 		}
 
-		// Normal Interaction logic (Claiming & Tabs)
+		// Normal Interaction logic (Claiming)
 		if (!isEditMode && click.button() == 0) {
-			int currentTabY = startY + 20;
-			for (String category : categories) {
-				int tabX = startX - tabWidth;
-				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= currentTabY && mouseY <= currentTabY + tabHeight) {
-					selectedCategory = category;
-					refreshQuests();
-					return true;
-				}
-				currentTabY += tabHeight + 5;
-			}
-
 			if (isMouseInWindow) {
 				for (QuestNode quest : questList) {
 					if (isHovering(quest, localMouseX, localMouseY)) {
 						if (quest.isLocked()) return true;
 
-						int currentProg = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
-						int requiredAmount = PacPackQuestsClient.CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
-						boolean isClaimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
+						int currentProg = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+						int requiredAmount = CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
+						boolean isClaimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
 						if (currentProg >= requiredAmount && !isClaimed) {
 							ClientPlayNetworking.send(new ClaimQuestPayload(quest.id()));
@@ -472,7 +485,7 @@ public class QuestScreen extends Screen {
 			ClientPlayNetworking.send(new MoveQuestPayload(draggedQuestId, dropGridX, dropGridY));
 
 			// 2. Recreate the definition locally with the new X and Y to prevent UI lag
-			QuestDefinition oldDef = PacPackQuestsClient.CLIENT_DEFINITIONS.get(draggedQuestId);
+			QuestDefinition oldDef = CLIENT_DEFINITIONS.get(draggedQuestId);
 			if (oldDef != null) {
 				QuestDefinition newDef = new QuestDefinition(
 						oldDef.id(), oldDef.title(), oldDef.category(),
@@ -483,7 +496,7 @@ public class QuestScreen extends Screen {
 				);
 
 				// 3. Overwrite the old quest in the client's memory
-				PacPackQuestsClient.CLIENT_DEFINITIONS.put(draggedQuestId, newDef);
+				CLIENT_DEFINITIONS.put(draggedQuestId, newDef);
 			}
 
 			draggedQuestId = null;
@@ -516,7 +529,25 @@ public class QuestScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyInput input) {
-		if (PacPackQuestsClient.openQuestMenuKey.matchesKey(input)) {
+		if (this.inlineCategoryField.isVisible() && this.inlineCategoryField.isFocused()) {
+			if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+				String newName = this.inlineCategoryField.getText().trim().toLowerCase().replace(" ", "_");
+				if (!newName.isEmpty()) {
+					ClientPlayNetworking.send(new CreateCategoryPayload(newName));
+					addNewCategory(newName);
+				}
+				this.inlineCategoryField.setVisible(false);
+				this.inlineCategoryField.setText("");
+				return true;
+			}
+			else if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+				this.inlineCategoryField.setVisible(false);
+				this.inlineCategoryField.setText("");
+				return true;
+			}
+		}
+
+		if (openQuestMenuKey.matchesKey(input)) {
 			this.close();
 			return true;
 		}
@@ -571,10 +602,10 @@ public class QuestScreen extends Screen {
 	}
 
 	private void claimAllQuests() {
-		for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
-			int currentProg = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+		for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
+			int currentProg = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
 			int requiredAmount = quest.requiredAmount();
-			boolean isClaimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
+			boolean isClaimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
 			// Check if quest is ready to be claimed
 			if (currentProg >= requiredAmount && !isClaimed) {
@@ -583,7 +614,7 @@ public class QuestScreen extends Screen {
 				boolean isLocked = false;
 				if (quest.parents() != null) {
 					for (String parentId : quest.parents()) {
-						if (!PacPackQuestsClient.CLIENT_FINISHED.getOrDefault(parentId, false)) {
+						if (!CLIENT_FINISHED.getOrDefault(parentId, false)) {
 							isLocked = true;
 							break;
 						}
@@ -600,16 +631,16 @@ public class QuestScreen extends Screen {
 	}
 
 	private boolean hasClaimableQuests() {
-		for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
-			int currentProg = PacPackQuestsClient.CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
+		for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
+			int currentProg = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
 			int requiredAmount = quest.requiredAmount();
-			boolean isClaimed = PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(quest.id(), false);
+			boolean isClaimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
 			if (currentProg >= requiredAmount && !isClaimed) {
 				boolean isLocked = false;
 				if (quest.parents() != null) {
 					for (String parentId : quest.parents()) {
-						if (!PacPackQuestsClient.CLIENT_CLAIMED.getOrDefault(parentId, false)) {
+						if (!CLIENT_CLAIMED.getOrDefault(parentId, false)) {
 							isLocked = true;
 							break;
 						}
@@ -627,6 +658,14 @@ public class QuestScreen extends Screen {
 		if (this.claimAllButton != null) {
 			this.claimAllButton.active = hasClaimableQuests();
 		}
+	}
+
+	public void addNewCategory(String categoryName) {
+		if (!CLIENT_CATEGORIES.contains(categoryName)) {
+			CLIENT_CATEGORIES.add(categoryName);
+		}
+		selectedCategory = categoryName;
+		refreshQuests();
 	}
 
 	public void refreshUI() {

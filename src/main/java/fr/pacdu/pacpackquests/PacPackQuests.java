@@ -50,11 +50,13 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(QuestSyncPayload.ID, QuestSyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(QuestProgressPayload.ID, QuestProgressPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
 
 		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(SaveQuestPayload.ID, SaveQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
 
 		// Connection Event: Sync all quests progress when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -278,7 +280,7 @@ public class PacPackQuests implements ModInitializer {
 				try {
 					Files.writeString(questFile, GSON.toJson(json));
 
-					// Mise à jour de la mémoire serveur
+					// Update server memory
 					QuestDefinition newDef = new QuestDefinition(
 							payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
 							payload.requiredAmount(), new ItemStack(Registries.ITEM.get(Identifier.of(payload.iconId()))),
@@ -287,7 +289,7 @@ public class PacPackQuests implements ModInitializer {
 					);
 					QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
 
-					// Synchronisation aux joueurs
+					// Sync to players
 					QuestSyncPayload syncPacket = new QuestSyncPayload(
 							payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
 							payload.requiredAmount(), payload.iconId(), payload.rewardId(), payload.rewardType(),
@@ -312,11 +314,27 @@ public class PacPackQuests implements ModInitializer {
 						Files.deleteIfExists(questFile);
 						QuestManager.LOADED_QUESTS.remove(payload.questId());
 
-						// Prévenir les clients de l'effacer
 						context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new DeleteQuestPayload(payload.questId())));
 					} catch (Exception e) {
 						PacPackQuests.LOGGER.error("Failed to delete quest", e);
 					}
+				}
+			});
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.ID, (payload, context) -> {
+			context.server().execute(() -> {
+				if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
+
+				Path categoryDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + payload.category());
+				try {
+					if (!java.nio.file.Files.exists(categoryDir)) {
+						java.nio.file.Files.createDirectories(categoryDir);
+					}
+
+					context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new CreateCategoryPayload(payload.category())));
+				} catch (Exception e) {
+					PacPackQuests.LOGGER.error("Failed to create category folder", e);
 				}
 			});
 		});
