@@ -3,15 +3,15 @@
 	"id": "pacpack-quests",
 	"version": "${version}",
 	"name": "PacPack Quests",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "A lightweight, fully in-game questing system for Fabric. Create, edit, and organize drag-and-drop quest trees directly from the game, with full multiplayer synchronization.",
 	"authors": [
-		"Me!"
+		"PacDu"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://modrinth.com/modpack/pacpack-quests",
+		"sources": "https://github.com/PacDu/pacpack-quests"
 	},
-	"license": "CC0-1.0",
+	"license": "MIT",
 	"icon": "assets/pacpack-quests/icon.png",
 	"environment": "*",
 	"entrypoints": {
