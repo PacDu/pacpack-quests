@@ -3,7 +3,6 @@ package fr.pacdu.pacpackquests.client;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
-import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
 import fr.pacdu.pacpackquests.network.CreateCategoryPayload;
 import fr.pacdu.pacpackquests.network.DeleteCategoryPayload;
@@ -50,6 +49,7 @@ public class QuestScreen extends Screen {
 
 	// --- Edit Mode System ---
 	private boolean isEditMode = false;
+	private boolean isMouseOverNode = false;
 	private String draggedQuestId = null;
 
 	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) {}
@@ -162,20 +162,20 @@ public class QuestScreen extends Screen {
 		context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, startY - 18, -1);
 
 		// --- DRAW CATEGORIES ---
+		int tabX = startX - tabWidth;
 		int currentTabY = startY + 20;
 		for (String category : CLIENT_CATEGORIES) {
-			boolean isSelected = category.equals(selectedCategory);
-			int color = isSelected ? 0xFF666666 : 0xFF333333;
-			int tabX = startX - tabWidth;
+			boolean isSelected = category.equals(selectedCategory) || isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
 
-			context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, color);
+			context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
 			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
 
 			if (isEditMode) {
 				int delBtnX = tabX + tabWidth - 14;
 				int delBtnY = currentTabY + 4;
-				context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, 0xFF991111);
-				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, 0xFFFFFFFF);
+				boolean isHover = isHovering(delBtnX, delBtnY, 10, 10, mouseX, mouseY);
+				context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, isHover ? 0xFFCC1111 : 0xFF991111);
+				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, isHover ? 0xFFFFFFFF : 0xFFAAAAAA);
 			}
 
 			currentTabY += tabHeight + 5;
@@ -183,10 +183,10 @@ public class QuestScreen extends Screen {
 
 		// --- ADD CATEGORY BUTTON / INLINE FIELD ---
 		if (isEditMode) {
-			int tabX = startX - tabWidth;
 			if (!this.inlineCategoryField.isVisible()) {
-				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, 0xFF444444);
-				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("+").formatted(Formatting.GRAY, Formatting.BOLD), tabX + tabWidth / 2, currentTabY + 6, 0xFFFFFFFF);
+				boolean isHover = isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
+				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isHover ? 0xFF666666 : 0xFF444444);
+				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("+").formatted(Formatting.BOLD), tabX + tabWidth / 2, currentTabY + 6, isHover ? 0xFFFFFFFF : 0xFFBBBBBB);
 			} else {
 				this.inlineCategoryField.setX(tabX);
 				this.inlineCategoryField.setY(currentTabY);
@@ -199,6 +199,8 @@ public class QuestScreen extends Screen {
 
 		QuestNode hoveredNode = null;
 		QuestNode nodeBeingDragged = null;
+		int hoveredDotX = -1;
+		int hoveredDotY = -1;
 
 		context.enableScissor(startX, startY, startX + windowWidth, startY + windowHeight);
 
@@ -210,9 +212,22 @@ public class QuestScreen extends Screen {
 		if (isEditMode) {
 			for (int gx = 0; gx < 20; gx++) {
 				for (int gy = 0; gy < 20; gy++) {
-					int dotX = canvasOffsetX + (gx * gridSpacing) + 8;
-					int dotY = canvasOffsetY + (gy * gridSpacing) + 8;
+					int bgColor = 0x11FFFFFF;
+					int bgX = canvasOffsetX + (gx * gridSpacing);
+					int bgY = canvasOffsetY + (gy * gridSpacing);
+
+					if (isEditMode && isMouseInWindow && isHoveringNode(bgX, bgY, localMouseX, localMouseY))
+						bgColor = 0xFF666666;
+					context.fill(bgX - 4, bgY - 4, bgX + 20, bgY + 20, bgColor);
+
+					int dotX = canvasOffsetX + (gx * gridSpacing) + 7;
+					int dotY = canvasOffsetY + (gy * gridSpacing) + 7;
 					context.fill(dotX, dotY, dotX + 2, dotY + 2, 0x55FFFFFF);
+
+					if (isMouseInWindow && isHoveringNode(bgX, bgY, localMouseX, localMouseY)) {
+						hoveredDotX = dotX;
+						hoveredDotY = dotY;
+					}
 				}
 			}
 		}
@@ -235,7 +250,7 @@ public class QuestScreen extends Screen {
 				continue; // Skip rendering the dragged node here; we draw it at the mouse position later
 			}
 			renderNode(context, quest, localMouseX, localMouseY, isMouseInWindow);
-			if (isMouseInWindow && isHovering(quest, localMouseX, localMouseY)) {
+			if (isMouseInWindow && isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 				hoveredNode = quest;
 			}
 		}
@@ -263,11 +278,16 @@ public class QuestScreen extends Screen {
 
 		if (hoveredNode != null && !isEditMode) { // Tooltips can get in the way during editing
 			drawQuestTooltip(context, hoveredNode, mouseX, mouseY);
-		} else if (hoveredNode != null && isEditMode) {
+		} else if (hoveredNode != null) {
 			List<Text> editTooltip = new ArrayList<>();
-			editTooltip.add(Text.literal("Edit Mode Actions:").formatted(Formatting.YELLOW, Formatting.BOLD));
-			editTooltip.add(Text.literal("Left Click & Drag").formatted(Formatting.GRAY).append(Text.literal(" to Move").formatted(Formatting.WHITE)));
-			editTooltip.add(Text.literal("Right Click").formatted(Formatting.GRAY).append(Text.literal(" to Edit/Delete").formatted(Formatting.WHITE)));
+			editTooltip.add(Text.translatable("gui.pacpack-quests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
+			editTooltip.add(Text.translatable("gui.pacpack-quests.click_drag").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_move").formatted(Formatting.WHITE)));
+			editTooltip.add(Text.translatable("gui.pacpack-quests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_edit_delete").formatted(Formatting.WHITE)));
+			context.drawTooltip(this.textRenderer, editTooltip, mouseX, mouseY);
+		} else if (hoveredDotX >= 0 && hoveredDotY >= 0 && isEditMode) {
+			List<Text> editTooltip = new ArrayList<>();
+			editTooltip.add(Text.translatable("gui.pacpack-quests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
+			editTooltip.add(Text.translatable("gui.pacpack-quests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_add").formatted(Formatting.WHITE)));
 			context.drawTooltip(this.textRenderer, editTooltip, mouseX, mouseY);
 		}
 	}
@@ -280,10 +300,10 @@ public class QuestScreen extends Screen {
 		int bgColor = 0xFF333333;
 		if (quest.isLocked()) bgColor = 0xFF221111;
 		else if (claimed) bgColor = 0xFF225522;
-		else if (progress >= requiredAmount) bgColor = 0xFF555522;
+		else if (progress >= requiredAmount) bgColor = !isEditMode && checkHover && isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY) ? 0xFF808033 : 0xFF555522;
 
 		// Highlight hovered node in edit mode
-		if (isEditMode && checkHover && isHovering(quest, localMouseX, localMouseY)) {
+		if (isEditMode && checkHover && isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 			bgColor = 0xFF666666;
 		}
 
@@ -438,14 +458,14 @@ public class QuestScreen extends Screen {
 		if (isEditMode && isMouseInWindow) {
 			if (click.button() == 0) { // Left Click: Pick up node to drag
 				for (QuestNode quest : questList) {
-					if (isHovering(quest, localMouseX, localMouseY)) {
+					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 						draggedQuestId = quest.id();
 						return true; // Consume event to prevent panning
 					}
 				}
 			} else if (click.button() == 1) { // Right Click: Open Edit/Delete Menu
 				for (QuestNode quest : questList) {
-					if (isHovering(quest, localMouseX, localMouseY)) {
+					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 						// Edit existing quest
 						MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, quest.id(), selectedCategory, quest.displayX(), quest.displayY()));
 						return true;
@@ -463,7 +483,7 @@ public class QuestScreen extends Screen {
 		if (!isEditMode && click.button() == 0) {
 			if (isMouseInWindow) {
 				for (QuestNode quest : questList) {
-					if (isHovering(quest, localMouseX, localMouseY)) {
+					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 						if (quest.isLocked()) return true;
 
 						int currentProg = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
@@ -583,9 +603,13 @@ public class QuestScreen extends Screen {
 		return super.keyPressed(input);
 	}
 
-	private boolean isHovering(QuestNode quest, double localMouseX, double localMouseY) {
-		return localMouseX >= quest.x() - 4 && localMouseX <= quest.x() + 20 &&
-				localMouseY >= quest.y() - 4 && localMouseY <= quest.y() + 20;
+	private boolean isHovering(int x, int y, int width, int height, double localMouseX, double localMouseY) {
+		return localMouseX >= x && localMouseX <= x + width &&
+				localMouseY >= y && localMouseY <= y + height;
+	}
+
+	private boolean isHoveringNode(int nodeX, int nodeY, double localMouseX, double localMouseY) {
+		return isHovering(nodeX - 4, nodeY - 4, 24, 24, localMouseX, localMouseY);
 	}
 
 	private String getTranslatedTargetName(String target) {
