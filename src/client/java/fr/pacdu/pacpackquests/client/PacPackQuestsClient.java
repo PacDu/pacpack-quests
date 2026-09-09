@@ -50,93 +50,82 @@ public class PacPackQuestsClient implements ClientModInitializer {
 			}
 		});
 
-		ClientPlayNetworking.registerGlobalReceiver(QuestSyncPayload.ID, (payload, context) -> {
-			context.client().execute(() -> {
-				Item icon = Registries.ITEM.get(Identifier.of(payload.iconId()));
-				Item reward = Registries.ITEM.get(Identifier.of(payload.rewardId()));
+		ClientPlayNetworking.registerGlobalReceiver(QuestSyncPayload.ID, (payload, context) -> context.client().execute(() -> {
+            Item icon = Registries.ITEM.get(Identifier.of(payload.iconId()));
+            Item reward = Registries.ITEM.get(Identifier.of(payload.rewardId()));
 
-				// Reconstruct the quest definition with the newly received reward data
-				QuestDefinition def = new QuestDefinition(
-						payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
-						payload.requiredAmount(), new ItemStack(icon), new ItemStack(reward), payload.rewardType(),
-						payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
-				);
-				CLIENT_DEFINITIONS.put(payload.questId(), def);
+            // Reconstruct the quest definition with the newly received reward data
+            QuestDefinition def = new QuestDefinition(
+                    payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
+                    payload.requiredAmount(), new ItemStack(icon), new ItemStack(reward), payload.rewardType(),
+                    payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
+            );
+            CLIENT_DEFINITIONS.put(payload.questId(), def);
 
-				for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
-					if (!CLIENT_CATEGORIES.contains(quest.category())) {
-						CLIENT_CATEGORIES.add(quest.category());
-					}
-				}
+            for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
+                if (!CLIENT_CATEGORIES.contains(quest.category())) {
+                    CLIENT_CATEGORIES.add(quest.category());
+                }
+            }
 
-				// --- CONFIG-BASED SORTING ---
-				// Replace ModConfig.categoryOrder with the actual variable from your config file
-				List<String> configuredOrder = ModConfig.categoryOrder;
+            // --- CONFIG-BASED SORTING ---
+            // Replace ModConfig.categoryOrder with the actual variable from your config file
+            List<String> configuredOrder = ModConfig.categoryOrder;
 
-				CLIENT_CATEGORIES.sort((cat1, cat2) -> {
-					int index1 = configuredOrder.indexOf(cat1);
-					int index2 = configuredOrder.indexOf(cat2);
+            CLIENT_CATEGORIES.sort((cat1, cat2) -> {
+                int index1 = configuredOrder.indexOf(cat1);
+                int index2 = configuredOrder.indexOf(cat2);
 
-					// Both categories are missing from the config -> Sort them alphabetically at the end
-					if (index1 == -1 && index2 == -1) return cat1.compareTo(cat2);
+                // Both categories are missing from the config -> Sort them alphabetically at the end
+                if (index1 == -1 && index2 == -1) return cat1.compareTo(cat2);
 
-					// Only cat1 is missing -> Push it to the bottom
-					if (index1 == -1) return 1;
+                // Only cat1 is missing -> Push it to the bottom
+                if (index1 == -1) return 1;
 
-					// Only cat2 is missing -> Push it to the bottom
-					if (index2 == -1) return -1;
+                // Only cat2 is missing -> Push it to the bottom
+                if (index2 == -1) return -1;
 
-					// Both are in the config -> Sort them according to the configured order
-					return Integer.compare(index1, index2);
-				});
+                // Both are in the config -> Sort them according to the configured order
+                return Integer.compare(index1, index2);
+            });
 
-				if (context.client().currentScreen instanceof QuestScreen qs) qs.refreshUI();
-			});
-		});
+            if (context.client().currentScreen instanceof QuestScreen qs) qs.refreshUI();
+        }));
 
 		// Listen for progress synchronization packets from the server
-		ClientPlayNetworking.registerGlobalReceiver(QuestProgressPayload.ID, (payload, context) -> {
-			context.client().execute(() -> {
-				CLIENT_PROGRESS.put(payload.questId(), payload.progress());
-				CLIENT_FINISHED.put(payload.questId(), payload.isFinished());
-				CLIENT_CLAIMED.put(payload.questId(), payload.isClaimed());
+		ClientPlayNetworking.registerGlobalReceiver(QuestProgressPayload.ID, (payload, context) -> context.client().execute(() -> {
+            CLIENT_PROGRESS.put(payload.questId(), payload.progress());
+            CLIENT_FINISHED.put(payload.questId(), payload.isFinished());
+            CLIENT_CLAIMED.put(payload.questId(), payload.isClaimed());
 
-				if (context.client().currentScreen instanceof QuestScreen questScreen) {
-					questScreen.updateClaimButtonState();
-				}
-			});
-		});
+            if (context.client().currentScreen instanceof QuestScreen questScreen) {
+                questScreen.updateClaimButtonState();
+            }
+        }));
 
-		ClientPlayNetworking.registerGlobalReceiver(DeleteQuestPayload.ID, (payload, context) -> {
-			context.client().execute(() -> {
-				CLIENT_DEFINITIONS.remove(payload.questId());
-				CLIENT_PROGRESS.remove(payload.questId());
-				CLIENT_FINISHED.remove(payload.questId());
-				CLIENT_CLAIMED.remove(payload.questId());
+		ClientPlayNetworking.registerGlobalReceiver(DeleteQuestPayload.ID, (payload, context) -> context.client().execute(() -> {
+            CLIENT_DEFINITIONS.remove(payload.questId());
+            CLIENT_PROGRESS.remove(payload.questId());
+            CLIENT_FINISHED.remove(payload.questId());
+            CLIENT_CLAIMED.remove(payload.questId());
 
-				if (context.client().currentScreen instanceof QuestScreen questScreen) {
-					questScreen.refreshUI();
-				}
-			});
-		});
+            if (context.client().currentScreen instanceof QuestScreen questScreen) {
+                questScreen.refreshUI();
+            }
+        }));
 
-		ClientPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.ID, (payload, context) -> {
-			context.client().execute(() -> {
-				if (!CLIENT_CATEGORIES.contains(payload.category())) {
-					CLIENT_CATEGORIES.add(payload.category());
-				}
-			});
-		});
+		ClientPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
+            if (!CLIENT_CATEGORIES.contains(payload.category())) {
+                CLIENT_CATEGORIES.add(payload.category());
+            }
+        }));
 
-		ClientPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> {
-			context.client().execute(() -> {
-				// Supprime de la mémoire toutes les quêtes liées à cette catégorie
-				CLIENT_DEFINITIONS.entrySet().removeIf(entry -> entry.getValue().category().equals(payload.category()));
+		ClientPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
+            CLIENT_DEFINITIONS.entrySet().removeIf(entry -> entry.getValue().category().equals(payload.category()));
 
-				if (context.client().currentScreen instanceof QuestScreen questScreen) {
-					questScreen.removeCategory(payload.category());
-				}
-			});
-		});
+            if (context.client().currentScreen instanceof QuestScreen questScreen) {
+                questScreen.removeCategory(payload.category());
+            }
+        }));
 	}
 }

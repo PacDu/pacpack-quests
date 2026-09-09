@@ -49,7 +49,6 @@ public class QuestScreen extends Screen {
 
 	// --- Edit Mode System ---
 	private boolean isEditMode = false;
-	private boolean isMouseOverNode = false;
 	private String draggedQuestId = null;
 
 	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) {}
@@ -92,7 +91,7 @@ public class QuestScreen extends Screen {
 		this.addDrawableChild(this.claimAllButton);
 
 		// "Edit Mode" Toggle Button (Only visible if player is OP)
-		if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().getServer().getPlayerManager().isOperator(MinecraftClient.getInstance().player.getPlayerConfigEntry())) {
+		if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.getPermissions().hasPermission(net.minecraft.command.DefaultPermissions.GAMEMASTERS)) {
 			this.addDrawableChild(
 					ButtonWidget.builder(Text.literal("Edit: " + (isEditMode ? "ON" : "OFF")).formatted(isEditMode ? Formatting.GREEN : Formatting.RED), button -> {
 								this.isEditMode = !this.isEditMode;

@@ -10,6 +10,7 @@ import net.minecraft.world.PersistentStateType;
 import net.minecraft.world.World;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 
@@ -43,7 +44,7 @@ public class QuestState extends PersistentState {
         this.markDirty();
     }
 
-    // 1. Define the Codec (Mojang's new serialization system replacing NBT methods)
+    // 1. Define the Codec
     public static final Codec<QuestState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             // Serialize the progress map
             Codec.unboundedMap(Codec.STRING, Codec.unboundedMap(Codec.STRING, Codec.INT))
@@ -84,6 +85,6 @@ public class QuestState extends PersistentState {
 
     public static QuestState getServerState(MinecraftServer server) {
         // getOrCreate now only takes the TYPE as a single argument
-        return server.getWorld(World.OVERWORLD).getPersistentStateManager().getOrCreate(TYPE);
+        return Objects.requireNonNull(server.getWorld(World.OVERWORLD)).getPersistentStateManager().getOrCreate(TYPE);
     }
 }

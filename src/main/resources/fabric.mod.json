@@ -2,7 +2,7 @@
 	"schemaVersion": 1,
 	"id": "pacpack-quests",
 	"version": "${version}",
-	"name": "PacPack Quest",
+	"name": "PacPack Quests",
 	"description": "This is an example description! Tell everyone what your mod is about!",
 	"authors": [
 		"Me!"
@@ -20,18 +20,8 @@
 		],
 		"client": [
 			"fr.pacdu.pacpackquests.client.PacPackQuestsClient"
-		],
-		"fabric-datagen": [
-			"fr.pacdu.pacpackquests.client.PacPackQuestsDataGenerator"
 		]
 	},
-	"mixins": [
-		"pacpack-quests.mixins.json",
-		{
-			"config": "pacpack-quests.client.mixins.json",
-			"environment": "client"
-		}
-	],
 	"depends": {
 		"fabricloader": ">=0.19.3",
 		"minecraft": "~1.21.11",

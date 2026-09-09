@@ -38,7 +38,7 @@ public class CraftingResultSlotMixin {
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
                 if (quest.type() == TaskType.CRAFT_ITEM) {
                     String target = quest.target().trim();
-                    boolean isTarget = false;
+                    boolean isTarget;
 
                     if (target.startsWith("#")) {
                         TagKey<Item> tag = TagKey.of(RegistryKeys.ITEM, Identifier.of(target.substring(1)));

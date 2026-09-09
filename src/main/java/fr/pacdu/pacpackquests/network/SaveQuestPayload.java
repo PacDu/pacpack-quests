@@ -2,6 +2,7 @@ package fr.pacdu.pacpackquests.network;
 
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
@@ -30,7 +31,7 @@ public record SaveQuestPayload(
                 buf.writeString(value.rewardId());
                 buf.writeEnumConstant(value.rewardType());
                 buf.writeInt(value.rewardAmount());
-                buf.writeCollection(value.parents(), (b, val) -> b.writeString(val));
+                buf.writeCollection(value.parents(), PacketByteBuf::writeString);
                 buf.writeInt(value.displayX());
                 buf.writeInt(value.displayY());
             },
@@ -38,7 +39,7 @@ public record SaveQuestPayload(
                     buf.readString(), buf.readString(), buf.readString(), buf.readEnumConstant(TaskType.class),
                     buf.readString(), buf.readInt(), buf.readString(), buf.readString(),
                     buf.readEnumConstant(RewardType.class), buf.readInt(),
-                    buf.readCollection(ArrayList::new, b -> b.readString()),
+                    buf.readCollection(ArrayList::new, PacketByteBuf::readString),
                     buf.readInt(), buf.readInt()
             )
     );
