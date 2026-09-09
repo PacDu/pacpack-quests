@@ -3,10 +3,7 @@ package fr.pacdu.pacpackquests.client;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
-import fr.pacdu.pacpackquests.network.ClaimQuestPayload;
-import fr.pacdu.pacpackquests.network.CreateCategoryPayload;
-import fr.pacdu.pacpackquests.network.DeleteCategoryPayload;
-import fr.pacdu.pacpackquests.network.MoveQuestPayload;
+import fr.pacdu.pacpackquests.network.*;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
@@ -50,6 +47,8 @@ public class QuestScreen extends Screen {
 	// --- Edit Mode System ---
 	private boolean isEditMode = false;
 	private String draggedQuestId = null;
+	private String categoryClickTarget = null;
+	private String draggedCategory = null;
 
 	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) {}
 
@@ -163,21 +162,47 @@ public class QuestScreen extends Screen {
 		// --- DRAW CATEGORIES ---
 		int tabX = startX - tabWidth;
 		int currentTabY = startY + 20;
+
+		int dropIndex = -1;
+		if (draggedCategory != null) {
+			dropIndex = Math.clamp((int) Math.round((mouseY - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
+		}
+
+		int catIndex = 0;
 		for (String category : CLIENT_CATEGORIES) {
-			boolean isSelected = category.equals(selectedCategory) || isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
-
-			context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
-			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
-
-			if (isEditMode) {
-				int delBtnX = tabX + tabWidth - 14;
-				int delBtnY = currentTabY + 4;
-				boolean isHover = isHovering(delBtnX, delBtnY, 10, 10, mouseX, mouseY);
-				context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, isHover ? 0xFFCC1111 : 0xFF991111);
-				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, isHover ? 0xFFFFFFFF : 0xFFAAAAAA);
+			// Draw the green insertion line
+			if (isEditMode && draggedCategory != null && dropIndex == catIndex) {
+				context.fill(tabX, currentTabY - 3, tabX + tabWidth, currentTabY - 1, 0xFF55FF55);
 			}
 
+			// The original tab is not drawn if it is being moved
+			if (!category.equals(draggedCategory)) {
+				boolean isSelected = category.equals(selectedCategory) || isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
+				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
+				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
+
+				if (isEditMode) {
+					int delBtnX = tabX + tabWidth - 14;
+					int delBtnY = currentTabY + 4;
+					boolean isHover = isHovering(delBtnX, delBtnY, 10, 10, mouseX, mouseY);
+					context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, isHover ? 0xFFCC1111 : 0xFF991111);
+					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, isHover ? 0xFFFFFFFF : 0xFFAAAAAA);
+				}
+			}
 			currentTabY += tabHeight + 5;
+			catIndex++;
+		}
+
+		// Insertion line if you let go all the way at the bottom
+		if (isEditMode && draggedCategory != null && dropIndex == CLIENT_CATEGORIES.size()) {
+			context.fill(tabX, currentTabY - 3, tabX + tabWidth, currentTabY - 1, 0xFF55FF55);
+		}
+
+		// Draw the floating tab attached to the mouse
+		if (isEditMode && draggedCategory != null) {
+			int floatY = mouseY - tabHeight / 2;
+			context.fill(tabX, floatY, tabX + tabWidth, floatY + tabHeight, 0xFF888888);
+			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(draggedCategory.toUpperCase()), tabX + tabWidth / 2, floatY + 6, 0xFFFFFFFF);
 		}
 
 		// --- ADD CATEGORY BUTTON / INLINE FIELD ---
@@ -429,10 +454,13 @@ public class QuestScreen extends Screen {
 					}
 				}
 
-				// 2. Normal click to change category
+				// 2. Normal click to change category OR prepare drag
 				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= currentTabY && mouseY <= currentTabY + tabHeight) {
 					selectedCategory = category;
 					refreshQuests();
+					if (isEditMode) {
+						categoryClickTarget = category;
+					}
 					return true;
 				}
 				currentTabY += tabHeight + 5;
@@ -502,6 +530,11 @@ public class QuestScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+		if (isEditMode && categoryClickTarget != null) {
+			draggedCategory = categoryClickTarget;
+			return true;
+		}
+
 		// If holding a node, do NOT pan the camera
 		if (isEditMode && draggedQuestId != null) {
 			return true;
@@ -518,9 +551,26 @@ public class QuestScreen extends Screen {
 		return super.mouseDragged(click, offsetX, offsetY);
 	}
 
-	// New Native Method: Triggered when the mouse button is released
 	@Override
 	public boolean mouseReleased(Click click) {
+		categoryClickTarget = null; // Reset click target
+
+		if (isEditMode && draggedCategory != null && click.button() == 0) {
+			int dropIndex = Math.clamp((int) Math.round((click.y() - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
+
+			CLIENT_CATEGORIES.remove(draggedCategory);
+
+			// Using Math.clamp after subtraction prevents OutOfBounds errors
+			dropIndex = Math.clamp(dropIndex, 0, CLIENT_CATEGORIES.size());
+			CLIENT_CATEGORIES.add(dropIndex, draggedCategory);
+
+			ClientPlayNetworking.send(new ReorderCategoryPayload(CLIENT_CATEGORIES));
+
+			draggedCategory = null;
+			refreshUI();
+			return true;
+		}
+
 		if (isEditMode && draggedQuestId != null && click.button() == 0) {
 			double localMouseX = (click.x() - startX - panX) / zoom;
 			double localMouseY = (click.y() - startY - panY) / zoom;

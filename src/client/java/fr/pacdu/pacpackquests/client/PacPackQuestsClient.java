@@ -127,5 +127,15 @@ public class PacPackQuestsClient implements ClientModInitializer {
                 questScreen.removeCategory(payload.category());
             }
         }));
+
+        ClientPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                CLIENT_CATEGORIES.clear();
+                CLIENT_CATEGORIES.addAll(payload.categories());
+                if (context.client().currentScreen instanceof QuestScreen questScreen) {
+                    questScreen.refreshUI();
+                }
+            });
+        });
 	}
 }

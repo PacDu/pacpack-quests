@@ -50,6 +50,7 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
 
 		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
@@ -57,6 +58,7 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playC2S().register(DeleteQuestPayload.ID, DeleteQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
 
 		// Connection Event: Sync all quests progress when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -348,6 +350,19 @@ public class PacPackQuests implements ModInitializer {
 
             } catch (Exception e) {
                 PacPackQuests.LOGGER.error("Failed to delete category folder", e);
+            }
+        }));
+
+        ServerPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> context.server().execute(() -> {
+            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
+
+            ModConfig.categoryOrder = payload.categories();
+            ModConfig.save();
+
+            for (var player : context.server().getPlayerManager().getPlayerList()) {
+                if (player != context.player()) {
+                    ServerPlayNetworking.send(player, payload);
+                }
             }
         }));
 	}
