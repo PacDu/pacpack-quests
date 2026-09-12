@@ -56,4 +56,4 @@ config/pacpackquests/
 *Note: If you manually edit the JSON files while the server is running, you will need to restart the server or rely on the in-game editor to overwrite changes. The in-game editor updates the server RAM and JSON files simultaneously.*
 
 ## 🔮 Future Evolutions
-PacPack Quests is actively in development. Future updates plan to expand the task variety (e.g., location-based tasks), introduce new reward choices (such as pool table), and maybe revamp the interface.
+PacPack Quests is still in development. Future updates plan to expand the task variety (e.g., location-based tasks), introduce new reward choices (such as pool table), and maybe revamp the interface.

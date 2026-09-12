@@ -579,22 +579,56 @@ public class QuestScreen extends Screen {
 			int dropGridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
 			int dropGridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
 
-			// 1. Send the new coordinates to the server
-			ClientPlayNetworking.send(new MoveQuestPayload(draggedQuestId, dropGridX, dropGridY));
-
-			// 2. Recreate the definition locally with the new X and Y to prevent UI lag
 			QuestDefinition oldDef = CLIENT_DEFINITIONS.get(draggedQuestId);
 			if (oldDef != null) {
-				QuestDefinition newDef = new QuestDefinition(
-						oldDef.id(), oldDef.title(), oldDef.category(),
-						oldDef.type(), oldDef.target(), oldDef.requiredAmount(),
-						oldDef.icon(), oldDef.reward(), oldDef.rewardType(),
-						oldDef.rewardAmount(), oldDef.parents(),
-						dropGridX, dropGridY
-				);
+				int finalX = dropGridX;
+				int finalY = dropGridY;
+				boolean foundSpot = false;
 
-				// 3. Overwrite the old quest in the client's memory
-				CLIENT_DEFINITIONS.put(draggedQuestId, newDef);
+				// Spiral search to find the nearest empty spot (max radius 3)
+				int maxRadius = 3;
+				searchLoop:
+				for (int r = 0; r <= maxRadius; r++) {
+					for (int dx = -r; dx <= r; dx++) {
+						for (int dy = -r; dy <= r; dy++) {
+							if (Math.abs(dx) == r || Math.abs(dy) == r) { // Check perimeter of current radius
+								int checkX = dropGridX + dx;
+								int checkY = dropGridY + dy;
+
+								// Ensure we stay within the 20x20 grid limits
+								if (checkX >= 0 && checkX < 20 && checkY >= 0 && checkY < 20) {
+									if (!isGridOccupied(checkX, checkY, draggedQuestId)) {
+										finalX = checkX;
+										finalY = checkY;
+										foundSpot = true;
+										break searchLoop;
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// Fallback to the original coordinates if the area is completely full or out of bounds
+				if (!foundSpot) {
+					finalX = oldDef.displayX();
+					finalY = oldDef.displayY();
+				}
+
+				// Only send packet and update if the position actually changed
+				if (finalX != oldDef.displayX() || finalY != oldDef.displayY()) {
+					ClientPlayNetworking.send(new MoveQuestPayload(draggedQuestId, finalX, finalY));
+
+					QuestDefinition newDef = new QuestDefinition(
+							oldDef.id(), oldDef.title(), oldDef.category(),
+							oldDef.type(), oldDef.target(), oldDef.requiredAmount(),
+							oldDef.icon(), oldDef.reward(), oldDef.rewardType(),
+							oldDef.rewardAmount(), oldDef.parents(),
+							finalX, finalY
+					);
+
+					CLIENT_DEFINITIONS.put(draggedQuestId, newDef);
+				}
 			}
 
 			draggedQuestId = null;
@@ -684,23 +718,65 @@ public class QuestScreen extends Screen {
 
 	// Keeps the camera within the bounds of the 20x20 grid
 	private void clampPanning() {
-		// 20 grid units * 48 pixels per unit = 960 total pixels
-		double canvasPixelWidth = 20 * gridSpacing;
-		double canvasPixelHeight = 20 * gridSpacing;
+		double currentMinPanX, currentMaxPanX;
+		double currentMinPanY, currentMaxPanY;
 
-		double maxPanX = 0;
-		double maxPanY = 0;
+		// Edit Mode or empty category: keep the full 20x20 grid limits
+		if (isEditMode || questList.isEmpty()) {
+			double canvasPixelWidth = 20 * gridSpacing;
+			double canvasPixelHeight = 20 * gridSpacing;
 
-		// We multiply by zoom because the physical size of the canvas changes as we zoom in/out.
-		double minPanX = -(canvasPixelWidth * zoom) + windowWidth;
-		double minPanY = -(canvasPixelHeight * zoom) +  windowHeight;
+			double boundX1 = 0;
+			double boundX2 = windowWidth - (canvasPixelWidth * zoom);
 
-		minPanX = Math.clamp(minPanX, -windowWidth, maxPanX);
-		minPanY = Math.clamp(minPanY, -windowHeight, maxPanY);
+			double boundY1 = 0;
+			double boundY2 = windowHeight - (canvasPixelHeight * zoom);
 
-		// Apply the limits safely
-		panX = Math.clamp(panX, minPanX, maxPanX);
-		panY = Math.clamp(panY, minPanY, maxPanY);
+			// Using Math.min and Math.max ensures the minimum is always strictly lower than the maximum,
+			// which prevents Math.clamp() from throwing an IllegalArgumentException when zooming out.
+			currentMinPanX = Math.min(boundX1, boundX2);
+			currentMaxPanX = Math.max(boundX1, boundX2);
+			currentMinPanY = Math.min(boundY1, boundY2);
+			currentMaxPanY = Math.max(boundY1, boundY2);
+		}
+		// Player Mode: restrict the camera dynamically to the existing quests
+		else {
+			int minX = Integer.MAX_VALUE;
+			int maxX = Integer.MIN_VALUE;
+			int minY = Integer.MAX_VALUE;
+			int maxY = Integer.MIN_VALUE;
+
+			// 1. Find the extreme coordinates of all quests in the current category
+			for (QuestNode quest : questList) {
+				// "- 4" and "+ 20" correspond to the actual rendering size of the nodes (24x24)
+				minX = Math.min(minX, quest.x() - 4);
+				maxX = Math.max(maxX, quest.x() + 20);
+				minY = Math.min(minY, quest.y() - 4);
+				maxY = Math.max(maxY, quest.y() + 20);
+			}
+
+			// 2. Add padding so the camera doesn't stop abruptly on the edge of the icons
+			int padding = 20;
+			minX -= padding;
+			maxX += padding;
+			minY -= padding;
+			maxY += padding;
+
+			// 3. Calculate dynamic bounds based on the current zoom level and window size
+			double boundX1 = -minX * zoom;
+			double boundX2 = windowWidth - maxX * zoom;
+			currentMinPanX = Math.min(boundX1, boundX2);
+			currentMaxPanX = Math.max(boundX1, boundX2);
+
+			double boundY1 = -minY * zoom;
+			double boundY2 = windowHeight - maxY * zoom;
+			currentMinPanY = Math.min(boundY1, boundY2);
+			currentMaxPanY = Math.max(boundY1, boundY2);
+		}
+
+		// 4. Safely apply the calculated limits to the camera
+		panX = Math.clamp(panX, currentMinPanX, currentMaxPanX);
+		panY = Math.clamp(panY, currentMinPanY, currentMaxPanY);
 	}
 
 	private void claimAllQuests() {
@@ -754,6 +830,18 @@ public class QuestScreen extends Screen {
 			}
 		}
 		return false; // No quests ready
+	}
+
+	private boolean isGridOccupied(int gridX, int gridY, String ignoreQuestId) {
+		for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
+			if (quest.category().equals(selectedCategory)
+					&& !quest.id().equals(ignoreQuestId)
+					&& quest.displayX() == gridX
+					&& quest.displayY() == gridY) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public void updateClaimButtonState() {
