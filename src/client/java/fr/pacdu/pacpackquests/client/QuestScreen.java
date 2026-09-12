@@ -37,9 +37,9 @@ public class QuestScreen extends Screen {
 	private TextFieldWidget inlineCategoryField;
 
 	// --- Camera & Canvas System ---
-	private double panX = 0;
-	private double panY = 0;
-	private float zoom = 1.0f;
+	private static double panX = 0;
+	private static double panY = 0;
+	private static float zoom = 1.0f;
 	private final int gridSpacing = 48;
 	private final int canvasOffsetX = 20;
 	private final int canvasOffsetY = 20;
@@ -121,11 +121,6 @@ public class QuestScreen extends Screen {
 
 	private void refreshQuests() {
 		questList.clear();
-
-		// Reset camera when refreshing or switching tabs
-		panX = 0;
-		panY = 0;
-		zoom = 1.0f;
 
 		for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
 			if (quest.category().equals(selectedCategory)) {
@@ -457,6 +452,11 @@ public class QuestScreen extends Screen {
 				// 2. Normal click to change category OR prepare drag
 				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= currentTabY && mouseY <= currentTabY + tabHeight) {
 					selectedCategory = category;
+
+					// Reset camera pos when refreshing or switching tabs
+					panX = 0;
+					panY = 0;
+
 					refreshQuests();
 					if (isEditMode) {
 						categoryClickTarget = category;
