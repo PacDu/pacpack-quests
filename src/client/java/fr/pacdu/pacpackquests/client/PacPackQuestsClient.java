@@ -128,14 +128,27 @@ public class PacPackQuestsClient implements ClientModInitializer {
             }
         }));
 
-        ClientPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> {
-            context.client().execute(() -> {
-                CLIENT_CATEGORIES.clear();
-                CLIENT_CATEGORIES.addAll(payload.categories());
-                if (context.client().currentScreen instanceof QuestScreen questScreen) {
-                    questScreen.refreshUI();
+        ClientPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
+            CLIENT_CATEGORIES.clear();
+            CLIENT_CATEGORIES.addAll(payload.categories());
+            if (context.client().currentScreen instanceof QuestScreen questScreen) {
+                questScreen.refreshUI();
+            }
+        }));
+
+        ClientPlayNetworking.registerGlobalReceiver(EditCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
+            for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
+                if (quest.category().equals(payload.categoryOld())) {
+                    QuestDefinition updatedQuest =  new QuestDefinition(quest.id(), quest.title(), payload.categoryNew(),
+                            quest.type(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
+                            quest.rewardType(), quest.rewardAmount(), quest.parents(), quest.displayX(), quest.displayY());
+                    CLIENT_DEFINITIONS.put(quest.id(), updatedQuest);
                 }
-            });
-        });
+            }
+
+            if (context.client().currentScreen instanceof QuestScreen questScreen) {
+                questScreen.renameCategory(payload.categoryOld(), payload.categoryNew());
+            }
+        }));
 	}
 }

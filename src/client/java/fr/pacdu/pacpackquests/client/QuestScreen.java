@@ -48,6 +48,7 @@ public class QuestScreen extends Screen {
 	private boolean isEditMode = false;
 	private String draggedQuestId = null;
 	private String categoryClickTarget = null;
+	private String categoryEditTarget = null;
 	private String draggedCategory = null;
 
 	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) {}
@@ -106,6 +107,8 @@ public class QuestScreen extends Screen {
 		this.inlineCategoryField.setMaxLength(15);
 		this.inlineCategoryField.setVisible(false);
 		this.addDrawableChild(this.inlineCategoryField);
+
+		this.categoryEditTarget = null;
 
 		if (CLIENT_CATEGORIES.isEmpty()) {
 			CLIENT_CATEGORIES.add("main");
@@ -172,16 +175,24 @@ public class QuestScreen extends Screen {
 
 			// The original tab is not drawn if it is being moved
 			if (!category.equals(draggedCategory)) {
-				boolean isSelected = category.equals(selectedCategory) || isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
-				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
-				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
+				if (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget)) {
+					boolean isSelected = category.equals(selectedCategory) || isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
+					context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
+					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
+				}
 
 				if (isEditMode) {
-					int delBtnX = tabX + tabWidth - 14;
+					int delBtnX = tabX - 14;
 					int delBtnY = currentTabY + 4;
-					boolean isHover = isHovering(delBtnX, delBtnY, 10, 10, mouseX, mouseY);
-					context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, isHover ? 0xFFCC1111 : 0xFF991111);
-					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, isHover ? 0xFFFFFFFF : 0xFFAAAAAA);
+					boolean isHoverDelBtn = isHovering(delBtnX, delBtnY, 10, 10, mouseX, mouseY);
+					context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, isHoverDelBtn ? 0xFFCC1111 : 0xFF991111);
+					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, isHoverDelBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
+
+					int editBtnX = delBtnX - 14;
+					int editBtnY = currentTabY + 4;
+					boolean isHoverEditBtn = isHovering(editBtnX, editBtnY, 10, 10, mouseX, mouseY);
+					context.fill(editBtnX, editBtnY, editBtnX + 10, editBtnY + 10, isHoverEditBtn ? 0xFF666666 : 0xFF333333);
+					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("🖊").formatted(Formatting.BOLD), editBtnX + 5, editBtnY + 1, isHoverEditBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
 				}
 			}
 			currentTabY += tabHeight + 5;
@@ -202,13 +213,10 @@ public class QuestScreen extends Screen {
 
 		// --- ADD CATEGORY BUTTON / INLINE FIELD ---
 		if (isEditMode) {
-			if (!this.inlineCategoryField.isVisible()) {
+			if (!this.inlineCategoryField.isVisible() || this.categoryEditTarget != null) {
 				boolean isHover = isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
 				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isHover ? 0xFF666666 : 0xFF444444);
 				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("+").formatted(Formatting.BOLD), tabX + tabWidth / 2, currentTabY + 6, isHover ? 0xFFFFFFFF : 0xFFBBBBBB);
-			} else {
-				this.inlineCategoryField.setX(tabX);
-				this.inlineCategoryField.setY(currentTabY);
 			}
 		}
 
@@ -430,9 +438,9 @@ public class QuestScreen extends Screen {
 			for (String category : CLIENT_CATEGORIES) {
 				int tabX = startX - tabWidth;
 
-				// 1. Intercept the click on the delete button (red cross)
+				// 1. Intercept the click on the delete button (red cross) or edit button (pen symbol)
 				if (isEditMode) {
-					int delBtnX = tabX + tabWidth - 14;
+					int delBtnX = tabX - 14;
 					int delBtnY = currentTabY + 4;
 					if (mouseX >= delBtnX && mouseX <= delBtnX + 10 && mouseY >= delBtnY && mouseY <= delBtnY + 10) {
 						this.client.setScreen(new net.minecraft.client.gui.screen.ConfirmScreen(
@@ -440,17 +448,30 @@ public class QuestScreen extends Screen {
 									if (confirmed) {
 										ClientPlayNetworking.send(new DeleteCategoryPayload(category));
 									}
-									this.client.setScreen(this); // Retour au menu des quêtes
+									this.client.setScreen(this);
 								},
 								Text.translatable("gui.pacpack-quests.delete_category_title"),
 								Text.translatable("gui.pacpack-quests.delete_category_desc").append(" " + category.toUpperCase() + " ?")
 						));
 						return true;
 					}
+
+					int editBtnX = delBtnX - 14;
+					int editBtnY = currentTabY + 4;
+					if (mouseX >= editBtnX && mouseX <= editBtnX + 10 && mouseY >= editBtnY && mouseY <= editBtnY + 10) {
+						categoryEditTarget = category;
+						this.inlineCategoryField.setX(tabX);
+						this.inlineCategoryField.setY(currentTabY);
+						this.inlineCategoryField.setVisible(true);
+						this.setFocused(this.inlineCategoryField);
+						this.inlineCategoryField.setFocused(true);
+						return true;
+					}
 				}
 
 				// 2. Normal click to change category OR prepare drag
-				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= currentTabY && mouseY <= currentTabY + tabHeight) {
+				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= currentTabY && mouseY <= currentTabY + tabHeight
+						&& (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget))) {
 					selectedCategory = category;
 
 					// Reset camera pos when refreshing or switching tabs
@@ -467,11 +488,12 @@ public class QuestScreen extends Screen {
 			}
 
 			// + category tab button
-			if (isEditMode && !this.inlineCategoryField.isVisible()) {
+			if (isEditMode && (!this.inlineCategoryField.isVisible() || this.categoryEditTarget != null)) {
 				int tabX = startX - tabWidth;
 				int plusButtonY = startY + 20 + CLIENT_CATEGORIES.size() * (tabHeight + 5);
 
 				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= plusButtonY && mouseY <= plusButtonY + tabHeight) {
+					this.categoryEditTarget = null;
 					this.inlineCategoryField.setX(tabX);
 					this.inlineCategoryField.setY(plusButtonY);
 					this.inlineCategoryField.setVisible(true);
@@ -664,17 +686,21 @@ public class QuestScreen extends Screen {
 		if (this.inlineCategoryField.isVisible() && this.inlineCategoryField.isFocused()) {
 			if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
 				String newName = this.inlineCategoryField.getText().trim().toLowerCase().replace(" ", "_");
-				if (!newName.isEmpty()) {
+				if (!newName.isEmpty() && categoryEditTarget == null) {
 					ClientPlayNetworking.send(new CreateCategoryPayload(newName));
 					addNewCategory(newName);
+				} else if (!newName.isEmpty()) {
+					ClientPlayNetworking.send(new EditCategoryPayload(categoryEditTarget, newName));
 				}
 				this.inlineCategoryField.setVisible(false);
 				this.inlineCategoryField.setText("");
+				categoryEditTarget = null;
 				return true;
 			}
 			else if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
 				this.inlineCategoryField.setVisible(false);
 				this.inlineCategoryField.setText("");
+				categoryEditTarget = null;
 				return true;
 			}
 		}
@@ -866,6 +892,27 @@ public class QuestScreen extends Screen {
 			selectedCategory = CLIENT_CATEGORIES.isEmpty() ? "main" : CLIENT_CATEGORIES.getFirst();
 		}
 		this.refreshUI();
+	}
+
+	public void renameCategory(String oldName, String newName) {
+		int index = CLIENT_CATEGORIES.indexOf(oldName);
+		if (index >= 0) {
+			List<String> newCategories = new ArrayList<>();
+
+			for (int i = 0; i < CLIENT_CATEGORIES.size(); i++) {
+				if (i == index) {
+					newCategories.add(newName);
+				} else {
+					newCategories.add(CLIENT_CATEGORIES.get(i));
+				}
+			}
+
+			CLIENT_CATEGORIES.clear();
+			CLIENT_CATEGORIES.addAll(newCategories);
+
+			if (selectedCategory.equals(oldName))
+				selectedCategory = newName;
+		}
 	}
 
 	public void refreshUI() {

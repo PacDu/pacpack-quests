@@ -34,7 +34,7 @@ When you right-click to create or edit a quest, you will see a form. Here is exa
 * **Reward Amount:** The quantity of the item, or the amount of XP/Levels given. *Accepted:* Numbers > 0.
 * **Parents (Comma separated):** Quest IDs that must be completed before this one unlocks. *Accepted:* Existing quest IDs separated by commas (e.g., `quest_1, quest_2`). Leave blank for starting quests.
 
-> **💡 Pro-Tip for finding IDs:** Press **`F3 + H`** in-game to enable Advanced Tooltips. Hovering over any item in your inventory will reveal its exact registry name (e.g., `minecraft:apple`). You can also browse a complete list of vanilla IDs at [MinecraftItemIDs.com](https://minecraftitemids.com/).
+> **💡 Pro-Tip for finding IDs:** Press **`F3 + H`** in-game to enable Advanced Tooltips. Hovering over any item in your inventory will reveal its exact registry name (e.g., `minecraft:apple`). You can also browse a complete list of vanilla IDs in the [Minecraft Wiki](https://minecraft.wiki/w/Tag_(Java_Edition)#List_of_tag_types).
 
 ## 📂 Configuration Architecture
 

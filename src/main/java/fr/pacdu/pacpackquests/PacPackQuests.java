@@ -28,6 +28,7 @@ import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -51,6 +52,7 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(EditCategoryPayload.ID, EditCategoryPayload.CODEC);
 
 		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
@@ -59,6 +61,7 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playC2S().register(CreateCategoryPayload.ID, CreateCategoryPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(EditCategoryPayload.ID, EditCategoryPayload.CODEC);
 
 		// Connection Event: Sync all quests progress when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -334,11 +337,11 @@ public class PacPackQuests implements ModInitializer {
             Path categoryDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + categoryToDelete);
 
             try {
-                java.io.File dir = categoryDir.toFile();
+                File dir = categoryDir.toFile();
                 if (dir.exists()) {
-                    java.io.File[] files = dir.listFiles();
+                    File[] files = dir.listFiles();
                     if (files != null) {
-                        for (java.io.File file : files) file.delete();
+                        for (File file : files) file.delete();
                     }
                     dir.delete();
                 }
@@ -363,6 +366,31 @@ public class PacPackQuests implements ModInitializer {
                 if (player != context.player()) {
                     ServerPlayNetworking.send(player, payload);
                 }
+            }
+        }));
+
+        ServerPlayNetworking.registerGlobalReceiver(EditCategoryPayload.ID, (payload, context) -> context.server().execute(() -> {
+            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
+
+            String categoryToEdit = payload.categoryOld();
+            String newCategory = payload.categoryNew();
+            Path categoryDirOld = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + categoryToEdit);
+            Path categoryDirNew = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + newCategory);
+
+            try {
+                File dir = categoryDirOld.toFile();
+                if (dir.exists()) {
+                    File newDir = categoryDirNew.toFile();
+                    dir.renameTo(newDir);
+                }
+
+                QuestManager.LOADED_QUESTS.values().removeIf(quest -> quest.category().equals(categoryToEdit));
+
+                EditCategoryPayload syncPayload = new EditCategoryPayload(categoryToEdit, newCategory);
+                context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPayload));
+
+            } catch (Exception e) {
+                PacPackQuests.LOGGER.error("Failed to edit category folder", e);
             }
         }));
 	}
