@@ -398,6 +398,9 @@ public class QuestScreen extends Screen {
 		if (parent.id().equals(draggedQuestId) || child.id().equals(draggedQuestId)) return;
 
 		int lineColor = child.isLocked() ? 0xFF444444 : 0xFF88AA88;
+
+		// Use brighter colors for the arrows so they pop out against the line and background
+		int arrowColor = child.isLocked() ? 0xFF888888 : 0xFFCCFFCC;
 		int thickness = 2;
 
 		// Calculate distance and angle between the two points
@@ -411,10 +414,27 @@ public class QuestScreen extends Screen {
 		context.getMatrices().translate((float) px, (float) py);
 		context.getMatrices().rotate(angle);
 
-		// Draw the rectangle starting from 0,0 along the new rotated X axis
+		// 1. Draw the main line
 		context.fill(0, -thickness / 2, (int) length, thickness / 2, lineColor);
 
+		// 2. Draw one perfect arrow in the middle
+		drawArrowChevron(context, (int) (length / 2) + 4, arrowColor);
+
 		context.getMatrices().popMatrix();
+	}
+
+	// Helper method to draw a crisp, pixel-art style chevron (>)
+	private void drawArrowChevron(DrawContext context, int x, int color) {
+		// Tip of the arrow (overlaps exactly with the line)
+		context.fill(x, -1, x + 2, 1, color);
+
+		// Inner wings
+		context.fill(x - 2, -3, x, -1, color);
+		context.fill(x - 2, 1, x, 3, color);
+
+		// Outer wings
+		context.fill(x - 4, -5, x - 2, -3, color);
+		context.fill(x - 4, 3, x - 2, 5, color);
 	}
 
 	private QuestNode getQuestById(String id) {
