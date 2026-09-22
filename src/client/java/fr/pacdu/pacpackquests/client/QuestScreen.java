@@ -754,11 +754,19 @@ public class QuestScreen extends Screen {
 		} else {
 			Identifier id = Identifier.of(target);
 
-			if (!Registries.ITEM.containsId(id) && Registries.ENTITY_TYPE.containsId(id)) {
+			// If it's an Item
+			if (Registries.ITEM.containsId(id)) {
+				return Registries.ITEM.get(id).getName().getString();
+			}
+			// If it's a Mob
+			else if (Registries.ENTITY_TYPE.containsId(id)) {
 				return Registries.ENTITY_TYPE.get(id).getName().getString();
 			}
-
-			return Registries.ITEM.get(id).getName().getString();
+			// If it's a Biome, Dimension or Structure
+			else {
+				String path = id.getPath();
+				return path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
+			}
 		}
 	}
 

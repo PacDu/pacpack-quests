@@ -6,7 +6,10 @@ import java.util.Map;
 public enum TaskType {
     MINE_BLOCK,
     KILL_MOB,
-    CRAFT_ITEM;
+    CRAFT_ITEM,
+    EXPLORE_BIOME,
+    EXPLORE_STRUCTURE,
+    EXPLORE_DIMENSION;
 
     // Caching values at startup
     private static final Map<String, TaskType> TASK_TYPE_MAP = new HashMap<>();

@@ -12,6 +12,7 @@ import fr.pacdu.pacpackquests.network.*;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -25,6 +26,7 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +99,7 @@ public class PacPackQuests implements ModInitializer {
 			}
 		});
 
+        // Check broken blocks
 		PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
 			if (!world.isClient()) {
 				// Iterate through all dynamically loaded quests
@@ -120,6 +123,7 @@ public class PacPackQuests implements ModInitializer {
 			}
 		});
 
+        // Check killed entities
 		ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity, damageSource) -> {
 			if (entity instanceof ServerPlayerEntity player) {
 
@@ -137,13 +141,76 @@ public class PacPackQuests implements ModInitializer {
 						}
 
 						if (isTarget) {
-							// Always increment by 1 for a single kill
 							QuestProgressHandler.incrementProgress(player, quest, 1);
 						}
 					}
 				}
 			}
 		});
+
+        //Check biome, structure and dimension
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            // Run every 5 ticks (4 times per second).
+            // Fast enough to catch players flying at extreme speeds,
+            // but 5x more optimized than vanilla Minecraft's advancement checks.
+            if (server.getTicks() % 5 != 0) return;
+
+            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                BlockPos pos = player.getBlockPos();
+                var world = player.getEntityWorld();
+                var registryManager = world.getRegistryManager();
+
+                // Loop through all active quests
+                for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+
+                    // Placeholder: Skip if the quest is already claimed or fully progressed
+                    // if (isQuestAlreadyFinishedForPlayer(player, quest.id())) continue;
+
+                    boolean requirementMet = false;
+                    String target = quest.target();
+                    boolean isTag = target.startsWith("#");
+                    Identifier targetId = Identifier.tryParse(isTag ? target.substring(1) : target);
+
+                    if (targetId == null) continue;
+
+                    switch (quest.type()) {
+                        case EXPLORE_DIMENSION -> {
+                            if (world.getRegistryKey().getValue().equals(targetId)) {
+                                requirementMet = true;
+                            }
+                        }
+                        case EXPLORE_BIOME -> {
+                            var biomeEntry = world.getBiome(pos);
+                            if (isTag) {
+                                if (biomeEntry.isIn(TagKey.of(RegistryKeys.BIOME, targetId))) requirementMet = true;
+                            } else {
+                                if (biomeEntry.matchesId(targetId)) requirementMet = true;
+                            }
+                        }
+                        case EXPLORE_STRUCTURE -> {
+                            // Use getOrThrow() for dynamic registries in 1.21+
+                            var structureRegistry = registryManager.getOrThrow(RegistryKeys.STRUCTURE);
+                            if (isTag) {
+                                TagKey<net.minecraft.world.gen.structure.Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, targetId);
+                                if (world.getStructureAccessor().getStructureContaining(pos, tag).hasChildren()) {
+                                    requirementMet = true;
+                                }
+                            } else {
+                                var structure = structureRegistry.get(targetId);
+                                // Check if the structure exists and if the player's current block is inside its bounding box
+                                if (structure != null && world.getStructureAccessor().getStructureContaining(pos, structure).hasChildren()) {
+                                    requirementMet = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (requirementMet) {
+                        QuestProgressHandler.incrementProgress(player, quest, 1);
+                    }
+                }
+            }
+        });
 
 		// Claim Event: Listen to reward claim requests
 		ServerPlayNetworking.registerGlobalReceiver(ClaimQuestPayload.ID, (payload, context) -> context.server().execute(() -> {

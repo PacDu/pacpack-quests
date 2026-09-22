@@ -6,6 +6,7 @@ import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.SaveQuestPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -88,6 +89,9 @@ public class EditQuestScreen extends Screen {
                 case MINE_BLOCK -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_mine").formatted(Formatting.DARK_GRAY));
                 case CRAFT_ITEM -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_craft").formatted(Formatting.DARK_GRAY));
                 case KILL_MOB -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_kill").formatted(Formatting.DARK_GRAY));
+                case EXPLORE_BIOME -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_biome").formatted(Formatting.DARK_GRAY));
+                case EXPLORE_STRUCTURE -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_structure").formatted(Formatting.DARK_GRAY));
+                case EXPLORE_DIMENSION -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_dimension").formatted(Formatting.DARK_GRAY));
             }
         }).dimensions(col1, y, fieldWidth, 20).build());
 
@@ -163,6 +167,11 @@ public class EditQuestScreen extends Screen {
                 case MINE_BLOCK -> Registries.BLOCK.getOptional(TagKey.of(RegistryKeys.BLOCK, id)).isPresent();
                 case CRAFT_ITEM -> Registries.ITEM.getOptional(TagKey.of(RegistryKeys.ITEM, id)).isPresent();
                 case KILL_MOB -> Registries.ENTITY_TYPE.getOptional(TagKey.of(RegistryKeys.ENTITY_TYPE, id)).isPresent();
+                case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).getOptional(TagKey.of(RegistryKeys.BIOME, id)).isPresent();
+                // The client doesn't know about structures, so we just trust the valid Identifier syntax, TODO: maybe find a better solution
+                case EXPLORE_STRUCTURE -> true;
+                // Dimensions don't use tags by default in vanilla
+                case EXPLORE_DIMENSION -> false;
             };
         }
 
@@ -174,6 +183,15 @@ public class EditQuestScreen extends Screen {
             case MINE_BLOCK -> Registries.BLOCK.containsId(id);
             case CRAFT_ITEM -> Registries.ITEM.containsId(id);
             case KILL_MOB -> Registries.ENTITY_TYPE.containsId(id);
+            case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).containsId(id);
+            // The client doesn't know about structures, so we just trust the valid Identifier syntax, TODO: maybe find a better solution
+            case EXPLORE_STRUCTURE -> true;
+            case EXPLORE_DIMENSION -> {
+                var handler = MinecraftClient.getInstance().getNetworkHandler();
+                // Use 'yield' to return the value from a block inside a switch expression.
+                // Checks if the dimension ID exists in the server's known world keys.
+                yield handler != null && handler.getWorldKeys().stream().anyMatch(key -> key.getValue().equals(id));
+            }
         };
     }
 
