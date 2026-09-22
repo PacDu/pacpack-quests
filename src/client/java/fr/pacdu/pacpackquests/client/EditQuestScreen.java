@@ -28,7 +28,17 @@ public class EditQuestScreen extends Screen {
     private final String category;
     private final int gridX, gridY;
 
-    private TextFieldWidget idField, titleField, targetField, reqAmountField, iconField, rewardField, rewardAmountField, parentsField;
+    // Standard Text Fields
+    private TextFieldWidget idField, titleField, reqAmountField, rewardAmountField, parentsField;
+
+    // Custom Selection Buttons (Replaced the TextFields)
+    private ButtonWidget targetButton, iconButton, rewardButton;
+
+    // State variables holding the currently selected Strings
+    private String selectedTarget = "minecraft:stone";
+    private String selectedIcon = "minecraft:stone";
+    private String selectedReward = "minecraft:diamond";
+
     private TaskType currentTaskType = TaskType.MINE_BLOCK;
     private RewardType currentRewardType = RewardType.ITEM;
 
@@ -49,96 +59,128 @@ public class EditQuestScreen extends Screen {
         int col2 = this.width / 2 + 5;
         int fieldWidth = 150;
 
-        int yStep = 34; // 20px for the field + 14px for the text above
-        int totalFormHeight = (yStep * 5) + 25; // 5 rows + the buttons row
-
+        int yStep = 34;
+        int totalFormHeight = (yStep * 5) + 25;
         int y = Math.max(35, (this.height - totalFormHeight) / 2);
 
-        // ROW 1: ID & Title
+        // --- PREFILL DATA IF EDITING ---
+        String initialTitle = "";
+        String initialReqAmt = "1";
+        String initialRewAmt = "1";
+        String initialParents = "";
+
+        // 1. On charge les données de la mémoire si on édite une quête
+        if (questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) {
+            QuestDefinition def = PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
+            initialTitle = def.title();
+            this.currentTaskType = def.type();
+
+            // On ne met à jour ces variables que si elles sont vides (pour ne pas écraser un retour de SelectionScreen)
+            if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
+            if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = Registries.ITEM.getId(def.icon().getItem()).toString();
+
+            this.currentRewardType = def.rewardType();
+
+            if (this.selectedReward == null || this.selectedReward.equals("minecraft:diamond")) this.selectedReward = Registries.ITEM.getId(def.reward().getItem()).toString();
+
+            initialReqAmt = String.valueOf(def.requiredAmount());
+            initialRewAmt = String.valueOf(def.rewardAmount());
+            if (def.parents() != null) initialParents = String.join(",", def.parents());
+        }
+
+        // 2. LA MAGIE ICI : On écrase les valeurs initiales par ce qui est actuellement tapé dans les champs (s'ils existent déjà)
+        String currentId = this.idField != null ? this.idField.getText() : "";
+        if (this.titleField != null) initialTitle = this.titleField.getText();
+        if (this.reqAmountField != null) initialReqAmt = this.reqAmountField.getText();
+        if (this.rewardAmountField != null) initialRewAmt = this.rewardAmountField.getText();
+        if (this.parentsField != null) initialParents = this.parentsField.getText();
+
+        // ROW 1: ID & Icon Button
         this.idField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.quest_id"));
         if (questId != null) {
             this.idField.setText(questId);
             this.idField.setEditable(false);
         } else {
+            // On restaure l'ID tapé lors de la création d'une nouvelle quête
+            this.idField.setText(currentId);
             this.idField.setTextPredicate(text -> text.matches("^[a-z0-9_]*$"));
             this.idField.setPlaceholder(Text.translatable("form.pacpack-quests.quest_id_placeholder").formatted(Formatting.DARK_GRAY));
         }
         this.addDrawableChild(this.idField);
 
-        this.iconField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.icon_item_id"));
-        this.iconField.setPlaceholder(Text.translatable("form.pacpack-quests.icon_item_id_placeholder").formatted(Formatting.DARK_GRAY));
-        this.addDrawableChild(this.iconField);
+        this.iconButton = ButtonWidget.builder(Text.literal(formatDisplayString(selectedIcon)), button -> {
+            this.client.setScreen(new SelectionScreen(this, SelectionScreen.SelectionContext.ITEM, result -> {
+                this.selectedIcon = result;
+                this.iconButton.setMessage(Text.literal(formatDisplayString(result)));
+            }));
+        }).dimensions(col2, y, fieldWidth, 20).build();
+        this.addDrawableChild(this.iconButton);
 
-        // ROW 2: Task Type & Target
+        // ROW 2: Title & Parents
         y += yStep;
         this.titleField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.title"));
+        this.titleField.setText(initialTitle);
         this.titleField.setPlaceholder(Text.translatable("form.pacpack-quests.title_placeholder").formatted(Formatting.DARK_GRAY));
         this.addDrawableChild(this.titleField);
 
         this.parentsField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.parents"));
+        this.parentsField.setText(initialParents);
         this.parentsField.setPlaceholder(Text.translatable("form.pacpack-quests.parents_placeholder").formatted(Formatting.DARK_GRAY));
         this.addDrawableChild(this.parentsField);
 
-        // ROW 3: Req Amount & Icon
+        // ROW 3: Task Type & Reward Type Toggles
         y += yStep - 10;
         this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + currentTaskType.name()), button -> {
             int nextOrdinal = (currentTaskType.ordinal() + 1) % TaskType.values().length;
             currentTaskType = TaskType.values()[nextOrdinal];
             button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + currentTaskType.name()));
-            switch(currentTaskType) {
-                case MINE_BLOCK -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_mine").formatted(Formatting.DARK_GRAY));
-                case CRAFT_ITEM -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_craft").formatted(Formatting.DARK_GRAY));
-                case KILL_MOB -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_kill").formatted(Formatting.DARK_GRAY));
-                case EXPLORE_BIOME -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_biome").formatted(Formatting.DARK_GRAY));
-                case EXPLORE_STRUCTURE -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_structure").formatted(Formatting.DARK_GRAY));
-                case EXPLORE_DIMENSION -> this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_dimension").formatted(Formatting.DARK_GRAY));
-            }
         }).dimensions(col1, y, fieldWidth, 20).build());
 
         this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + currentRewardType.name()), button -> {
             int nextOrdinal = (currentRewardType.ordinal() + 1) % RewardType.values().length;
             currentRewardType = RewardType.values()[nextOrdinal];
             button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + currentRewardType.name()));
-            this.rewardField.setVisible(currentRewardType == RewardType.ITEM);
+            this.rewardButton.active = (currentRewardType == RewardType.ITEM); // Disable selection if XP/Levels
         }).dimensions(col2, y, fieldWidth, 20).build());
 
-        // ROW 4: Reward Type & Target
+        // ROW 4: Target Button & Reward Button
         y += yStep;
-        this.targetField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.task_target"));
-        this.targetField.setPlaceholder(Text.translatable("form.pacpack-quests.task_target_placeholder_mine").formatted(Formatting.DARK_GRAY));
-        this.addDrawableChild(this.targetField);
+        this.targetButton = ButtonWidget.builder(Text.literal(formatDisplayString(selectedTarget)), button -> {
+            SelectionScreen.SelectionContext ctx = switch (currentTaskType) {
+                case MINE_BLOCK -> SelectionScreen.SelectionContext.BLOCK;
+                case CRAFT_ITEM -> SelectionScreen.SelectionContext.ITEM;
+                case KILL_MOB -> SelectionScreen.SelectionContext.MOB;
+                case EXPLORE_BIOME -> SelectionScreen.SelectionContext.BIOME;
+                case EXPLORE_STRUCTURE -> SelectionScreen.SelectionContext.STRUCTURE;
+                case EXPLORE_DIMENSION -> SelectionScreen.SelectionContext.DIMENSION;
+            };
+            this.client.setScreen(new SelectionScreen(this, ctx, result -> {
+                this.selectedTarget = result;
+                this.targetButton.setMessage(Text.literal(formatDisplayString(result)));
+            }));
+        }).dimensions(col1, y, fieldWidth, 20).build();
+        this.addDrawableChild(this.targetButton);
 
-        this.rewardField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.reward_item"));
-        this.rewardField.setPlaceholder(Text.translatable("form.pacpack-quests.reward_item_placeholder").formatted(Formatting.DARK_GRAY));
-        this.addDrawableChild(this.rewardField);
+        this.rewardButton = ButtonWidget.builder(Text.literal(formatDisplayString(selectedReward)), button -> {
+            this.client.setScreen(new SelectionScreen(this, SelectionScreen.SelectionContext.ITEM, result -> {
+                this.selectedReward = result;
+                this.rewardButton.setMessage(Text.literal(formatDisplayString(result)));
+            }));
+        }).dimensions(col2, y, fieldWidth, 20).build();
+        this.rewardButton.active = (currentRewardType == RewardType.ITEM);
+        this.addDrawableChild(this.rewardButton);
 
-        // ROW 5: Reward Amount & Parents
+        // ROW 5: Amounts
         y += yStep;
         this.reqAmountField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.required_amount"));
         this.reqAmountField.setTextPredicate(text -> text.matches("^[0-9]*$"));
-        this.reqAmountField.setPlaceholder(Text.translatable("form.pacpack-quests.required_amount_placeholder").formatted(Formatting.DARK_GRAY));
+        this.reqAmountField.setText(initialReqAmt);
         this.addDrawableChild(this.reqAmountField);
 
         this.rewardAmountField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.reward_amount"));
         this.rewardAmountField.setTextPredicate(text -> text.matches("^[0-9]*$"));
-        this.rewardAmountField.setPlaceholder(Text.translatable("form.pacpack-quests.reward_amount_placeholder").formatted(Formatting.DARK_GRAY));
+        this.rewardAmountField.setText(initialRewAmt);
         this.addDrawableChild(this.rewardAmountField);
-
-        // --- PREFILL DATA IF EDITING ---
-        if (questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) {
-            QuestDefinition def = PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
-            this.titleField.setText(def.title());
-            this.currentTaskType = def.type();
-            this.targetField.setText(def.target());
-            this.reqAmountField.setText(String.valueOf(def.requiredAmount()));
-            this.iconField.setText(Registries.ITEM.getId(def.icon().getItem()).toString());
-            this.currentRewardType = def.rewardType();
-            this.rewardField.setText(Registries.ITEM.getId(def.reward().getItem()).toString());
-            this.rewardAmountField.setText(String.valueOf(def.rewardAmount()));
-            if (def.parents() != null) {
-                this.parentsField.setText(String.join(",", def.parents()));
-            }
-        }
 
         // --- BOTTOM ACTION BUTTONS ---
         y += yStep + 8;
@@ -156,96 +198,85 @@ public class EditQuestScreen extends Screen {
         }
     }
 
-    // Helper to check if a target is valid in the Registries or is a valid Tag syntax
+    // Helper to format the long IDs into short readable button texts (e.g., "minecraft:stone" -> "Stone")
+    private String formatDisplayString(String raw) {
+        if (raw == null || raw.isEmpty()) return "...";
+        boolean isTag = raw.startsWith("#");
+        String clean = isTag ? raw.substring(1) : raw;
+        Identifier id = Identifier.tryParse(clean);
+        if (id == null) return raw;
+
+        String path = id.getPath();
+        String formatted = path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
+        if (formatted.length() > 18) formatted = formatted.substring(0, 15) + "..."; // Truncate long names
+        return isTag ? "# " + formatted : formatted;
+    }
+
+    // Validity checks are mostly handled by the selection screen now, but we keep this as a safeguard
     private boolean isValidTarget(String target, TaskType type) {
         if (target.startsWith("#")) {
             Identifier id = Identifier.tryParse(target.substring(1));
             if (id == null) return false;
-
-            // Check if the tag actually exists and is populated in the game's registries
             return switch (type) {
                 case MINE_BLOCK -> Registries.BLOCK.getOptional(TagKey.of(RegistryKeys.BLOCK, id)).isPresent();
                 case CRAFT_ITEM -> Registries.ITEM.getOptional(TagKey.of(RegistryKeys.ITEM, id)).isPresent();
                 case KILL_MOB -> Registries.ENTITY_TYPE.getOptional(TagKey.of(RegistryKeys.ENTITY_TYPE, id)).isPresent();
                 case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).getOptional(TagKey.of(RegistryKeys.BIOME, id)).isPresent();
-                // The client doesn't know about structures, so we just trust the valid Identifier syntax, TODO: maybe find a better solution
                 case EXPLORE_STRUCTURE -> true;
-                // Dimensions don't use tags by default in vanilla
                 case EXPLORE_DIMENSION -> false;
             };
         }
-
         Identifier id = Identifier.tryParse(target);
         if (id == null) return false;
-
-        // Check if the specific ID exists
         return switch (type) {
             case MINE_BLOCK -> Registries.BLOCK.containsId(id);
             case CRAFT_ITEM -> Registries.ITEM.containsId(id);
             case KILL_MOB -> Registries.ENTITY_TYPE.containsId(id);
             case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).containsId(id);
-            // The client doesn't know about structures, so we just trust the valid Identifier syntax, TODO: maybe find a better solution
             case EXPLORE_STRUCTURE -> true;
             case EXPLORE_DIMENSION -> {
                 var handler = MinecraftClient.getInstance().getNetworkHandler();
-                // Use 'yield' to return the value from a block inside a switch expression.
-                // Checks if the dimension ID exists in the server's known world keys.
                 yield handler != null && handler.getWorldKeys().stream().anyMatch(key -> key.getValue().equals(id));
             }
         };
     }
 
     private void saveQuest() {
-        // 1. Reset all fields to normal color (0xE0E0E0 is default text color)
         this.errorMessage = null;
         this.idField.setEditableColor(0xFFE0E0E0);
         this.titleField.setEditableColor(0xFFE0E0E0);
-        this.iconField.setEditableColor(0xFFE0E0E0);
-        this.targetField.setEditableColor(0xFFE0E0E0);
         this.reqAmountField.setEditableColor(0xFFE0E0E0);
-        this.rewardField.setEditableColor(0xFFE0E0E0);
         this.rewardAmountField.setEditableColor(0xFFE0E0E0);
         this.parentsField.setEditableColor(0xFFE0E0E0);
 
-        // 2. Validate ID
         String finalId = this.idField.getText().trim();
         if (finalId.isEmpty() || !finalId.matches("^[a-z0-9_]+$")) {
             this.errorMessage = "error.pacpack-quests.invalid_id";
-            this.idField.setEditableColor(0xFFFF5555); // Red
+            this.idField.setEditableColor(0xFFFF5555);
             return;
         }
-        // Prevent overwriting an existing ID if creating a new quest
         if (this.questId == null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(finalId)) {
             this.errorMessage = "error.pacpack-quests.id_already_exists";
             this.idField.setEditableColor(0xFFFF5555);
             return;
         }
 
-        // 3. Validate Title
         if (this.titleField.getText().trim().isEmpty()) {
             this.errorMessage = "error.pacpack-quests.missing_title";
             this.titleField.setEditableColor(0xFFFF5555);
             return;
         }
 
-        // 4. Validate Icon (Must be a valid Item Registry ID)
-        String iconIdStr = this.iconField.getText().trim();
-        Identifier iconId = Identifier.tryParse(iconIdStr);
-        if (iconIdStr.isEmpty() || iconId == null || !Registries.ITEM.containsId(iconId)) {
+        if (this.selectedIcon.isEmpty() || Identifier.tryParse(this.selectedIcon) == null) {
             this.errorMessage = "error.pacpack-quests.invalid_icon";
-            this.iconField.setEditableColor(0xFFFF5555);
             return;
         }
 
-        // 5. Validate Task Target
-        String targetStr = this.targetField.getText().trim();
-        if (targetStr.isEmpty() || !isValidTarget(targetStr, currentTaskType)) {
+        if (this.selectedTarget.isEmpty() || !isValidTarget(this.selectedTarget, currentTaskType)) {
             this.errorMessage = "error.pacpack-quests.invalid_target";
-            this.targetField.setEditableColor(0xFFFF5555);
             return;
         }
 
-        // 6. Validate Required Amount
         int reqAmt;
         try {
             reqAmt = Integer.parseInt(this.reqAmountField.getText().trim());
@@ -256,20 +287,8 @@ public class EditQuestScreen extends Screen {
             return;
         }
 
-        // 7. Validate Reward Item (Only if type is ITEM)
-        String finalRewardStr = this.rewardField.getText().trim();
-        if (currentRewardType == RewardType.ITEM) {
-            Identifier rewId = Identifier.tryParse(finalRewardStr);
-            if (finalRewardStr.isEmpty() || rewId == null || !Registries.ITEM.containsId(rewId)) {
-                this.errorMessage = "error.pacpack-quests.invalid_reward_item";
-                this.rewardField.setEditableColor(0xFFFF5555);
-                return;
-            }
-        } else {
-            finalRewardStr = "minecraft:air"; // Fallback placeholder for XP/Levels
-        }
+        String finalRewardStr = (currentRewardType == RewardType.ITEM) ? this.selectedReward : "minecraft:air";
 
-        // 8. Validate Reward Amount
         int rewAmt;
         try {
             rewAmt = Integer.parseInt(this.rewardAmountField.getText().trim());
@@ -280,7 +299,6 @@ public class EditQuestScreen extends Screen {
             return;
         }
 
-        // 9. Validate Parents (Must exist in memory and not be itself)
         ArrayList<String> parentsList = new ArrayList<>();
         String parentsStr = this.parentsField.getText().trim();
         if (!parentsStr.isEmpty()) {
@@ -300,11 +318,10 @@ public class EditQuestScreen extends Screen {
             }
         }
 
-        // 10. All checks passed -> Send to server
         SaveQuestPayload payload = new SaveQuestPayload(
                 finalId, this.titleField.getText().trim(), this.category,
-                this.currentTaskType, targetStr, reqAmt,
-                iconIdStr, finalRewardStr,
+                this.currentTaskType, this.selectedTarget, reqAmt,
+                this.selectedIcon, finalRewardStr,
                 this.currentRewardType, rewAmt, parentsList, this.gridX, this.gridY
         );
 
@@ -319,19 +336,16 @@ public class EditQuestScreen extends Screen {
 
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.quest_id"), this.idField.getX(), this.idField.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.title"), this.titleField.getX(), this.titleField.getY() - 10, 0xFFFFFFFF, true);
-
-        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.task_target"), this.targetField.getX(), this.targetField.getY() - 10, 0xFFFFFFFF, true);
-
-        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.required_amount"), this.reqAmountField.getX(), this.reqAmountField.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.icon_item_id"), this.iconField.getX(), this.iconField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.icon_item_id"), this.iconButton.getX(), this.iconButton.getY() - 10, 0xFFFFFFFF, true);
+        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.task_target"), this.targetButton.getX(), this.targetButton.getY() - 10, 0xFFFFFFFF, true);
 
         if (this.currentRewardType == RewardType.ITEM)
-            context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_item"), this.rewardField.getX(), this.rewardField.getY() - 10, 0xFFFFFFFF, true);
+            context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_item"), this.rewardButton.getX(), this.rewardButton.getY() - 10, 0xFFFFFFFF, true);
 
+        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.required_amount"), this.reqAmountField.getX(), this.reqAmountField.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_amount"), this.rewardAmountField.getX(), this.rewardAmountField.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.parents"), this.parentsField.getX(), this.parentsField.getY() - 10, 0xFFFFFFFF, true);
 
-        // --- DRAW ERROR MESSAGE ---
         if (this.errorMessage != null) {
             context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(this.errorMessage).formatted(Formatting.RED, Formatting.BOLD), this.width / 2, this.height - 20, 0xFFFFFFFF);
         }
