@@ -7,6 +7,7 @@ import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.SaveQuestPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -32,7 +33,9 @@ public class EditQuestScreen extends Screen {
     private TextFieldWidget idField, titleField, reqAmountField, rewardAmountField, parentsField;
 
     // Custom Selection Buttons (Replaced the TextFields)
-    private ButtonWidget targetButton, iconButton, rewardButton;
+    private ButtonWidget targetButton, iconButton, rewardButton, taskTypeButton;
+
+    private boolean isTaskDropdownOpen = false;
 
     // State variables holding the currently selected Strings
     private String selectedTarget = "minecraft:stone";
@@ -130,12 +133,10 @@ public class EditQuestScreen extends Screen {
 
         // ROW 3: Task Type & Reward Type Toggles
         y += yStep - 10;
-        this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + currentTaskType.name()), button -> {
-            int nextOrdinal = (currentTaskType.ordinal() + 1) % TaskType.values().length;
-            currentTaskType = TaskType.values()[nextOrdinal];
-            button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + currentTaskType.name()));
-            this.reqAmountField.setEditable(currentTaskType != TaskType.EXPLORE_DIMENSION && currentTaskType != TaskType.EXPLORE_BIOME);
-        }).dimensions(col1, y, fieldWidth, 20).build());
+        this.taskTypeButton = ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + currentTaskType.name()), button -> {
+            this.isTaskDropdownOpen = !this.isTaskDropdownOpen;
+        }).dimensions(col1, y, fieldWidth, 20).build();
+        this.addDrawableChild(this.taskTypeButton);
 
         this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + currentRewardType.name()), button -> {
             int nextOrdinal = (currentRewardType.ordinal() + 1) % RewardType.values().length;
@@ -158,11 +159,6 @@ public class EditQuestScreen extends Screen {
             this.client.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedTarget = result;
                 this.targetButton.setMessage(Text.literal(formatDisplayString(result)));
-
-                // If the task target is a biome or a dimension, set the required amount to 1
-                if (currentTaskType == TaskType.EXPLORE_DIMENSION || currentTaskType == TaskType.EXPLORE_BIOME) {
-                    this.reqAmountField.setText("1");
-                }
             }));
         }).dimensions(col1, y, fieldWidth, 20).build();
         this.addDrawableChild(this.targetButton);
@@ -181,6 +177,7 @@ public class EditQuestScreen extends Screen {
         this.reqAmountField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.required_amount"));
         this.reqAmountField.setTextPredicate(text -> text.matches("^[0-9]*$"));
         this.reqAmountField.setText(initialReqAmt);
+        this.reqAmountField.setEditable(this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME);
         this.addDrawableChild(this.reqAmountField);
 
         this.rewardAmountField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.reward_amount"));
@@ -336,6 +333,35 @@ public class EditQuestScreen extends Screen {
     }
 
     @Override
+    public boolean mouseClicked(Click click, boolean doubled) {
+        if (this.isTaskDropdownOpen && this.taskTypeButton != null) {
+            int dropX = this.taskTypeButton.getX();
+            int dropY = this.taskTypeButton.getY() + this.taskTypeButton.getHeight();
+            int dropWidth = this.taskTypeButton.getWidth();
+            int dropHeight = 20 * TaskType.values().length;
+
+            if (click.x() >= dropX && click.x() < dropX + dropWidth && click.y() >= dropY && click.y() < dropY + dropHeight) {
+                int index = (int) ((click.y() - dropY) / 20);
+                if (index >= 0 && index < TaskType.values().length) {
+                    this.currentTaskType = TaskType.values()[index];
+                    this.taskTypeButton.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + this.currentTaskType.name()));
+                    this.isTaskDropdownOpen = false;
+                    this.reqAmountField.setEditable(this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME);
+
+                    if (currentTaskType == TaskType.EXPLORE_DIMENSION || currentTaskType == TaskType.EXPLORE_BIOME) {
+                        this.reqAmountField.setText("1");
+                    }
+
+                    return true;
+                }
+            } else if (!this.taskTypeButton.isMouseOver(click.x(), click.y())) {
+                this.isTaskDropdownOpen = false;
+            }
+        }
+        return super.mouseClicked(click, doubled);
+    }
+
+    @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 10, 0xFFFFFFFF);
@@ -354,6 +380,33 @@ public class EditQuestScreen extends Screen {
 
         if (this.errorMessage != null) {
             context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(this.errorMessage).formatted(Formatting.RED, Formatting.BOLD), this.width / 2, this.height - 20, 0xFFFFFFFF);
+        }
+
+        // Draw TaskType dropdown menu on top
+        if (this.isTaskDropdownOpen && this.taskTypeButton != null) {
+            int dropX = this.taskTypeButton.getX();
+            int dropY = this.taskTypeButton.getY() + this.taskTypeButton.getHeight();
+            int dropWidth = this.taskTypeButton.getWidth();
+            int numOptions = TaskType.values().length;
+
+            // overall background
+            context.fill(dropX, dropY, dropX + dropWidth, dropY + (numOptions * 20), 0xFF000000);
+            
+            // outline
+            context.fill(dropX - 1, dropY - 1, dropX + dropWidth + 1, dropY, 0xFFAAAAAA); // top
+            context.fill(dropX - 1, dropY + (numOptions * 20), dropX + dropWidth + 1, dropY + (numOptions * 20) + 1, 0xFFAAAAAA); // bottom
+            context.fill(dropX - 1, dropY, dropX, dropY + (numOptions * 20), 0xFFAAAAAA); // left
+            context.fill(dropX + dropWidth, dropY, dropX + dropWidth + 1, dropY + (numOptions * 20), 0xFFAAAAAA); // right
+
+            for (int i = 0; i < numOptions; i++) {
+                int optY = dropY + (i * 20);
+                boolean hovered = mouseX >= dropX && mouseX < dropX + dropWidth && mouseY >= optY && mouseY < optY + 20;
+                
+                if (hovered) {
+                    context.fill(dropX, optY, dropX + dropWidth, optY + 20, 0xFF666666);
+                }
+                context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(TaskType.values()[i].name()), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
+            }
         }
     }
 }
