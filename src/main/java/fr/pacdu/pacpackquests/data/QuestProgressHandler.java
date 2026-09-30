@@ -29,7 +29,7 @@ public class QuestProgressHandler {
         if (current < quest.requiredAmount()) {
             int newProgress = Math.min(current + amountToAdd, quest.requiredAmount());
             boolean isFinished = newProgress >= quest.requiredAmount();
-            state.setProgress(playerId, quest.id(), newProgress);
+            state.setProgress(player, quest.id(), newProgress);
 
             ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), newProgress, isFinished, false));
         }

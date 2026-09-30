@@ -3,8 +3,11 @@ package fr.pacdu.pacpackquests.data;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.network.QuestCompletedPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
 import net.minecraft.world.World;
@@ -24,9 +27,21 @@ public class QuestState extends PersistentState {
         return progress.getOrDefault(player, new HashMap<>()).getOrDefault(questId, 0);
     }
 
-    public void setProgress(UUID player, String questId, int amount) {
-        progress.computeIfAbsent(player, k -> new HashMap<>()).put(questId, amount);
+    public void setProgress(ServerPlayerEntity player, String questId, int amount) {
+        QuestDefinition quest = QuestManager.LOADED_QUESTS.get(questId);
+        if (quest == null) return;
+
+        int oldProgress = this.getProgress(player.getUuid(), questId);
+
+        // Save the new progress
+        progress.computeIfAbsent(player.getUuid(), k -> new HashMap<>()).put(questId, amount);
         this.markDirty();
+
+        // Check if the quest just crossed the completion threshold
+        if (oldProgress < quest.requiredAmount() && amount >= quest.requiredAmount()) {
+            // Trigger the achievement toast on the client!
+            ServerPlayNetworking.send(player, new QuestCompletedPayload(questId));
+        }
     }
 
     public boolean isFinished(UUID player, String questId) {

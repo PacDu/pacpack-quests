@@ -59,5 +59,7 @@
   "error.pacpack-quests.invalid_amount": "Amount must be greater than 0!",
   "error.pacpack-quests.invalid_reward_item": "Invalid Reward! The item does not exist.",
   "error.pacpack-quests.self_parent": "A quest cannot be its own parent!",
-  "error.pacpack-quests.unknown_parent": "One or more parent IDs do not exist!"
+  "error.pacpack-quests.unknown_parent": "One or more parent IDs do not exist!",
+
+  "toast.pacpack-quests.completed": "Quest Completed!"
 }

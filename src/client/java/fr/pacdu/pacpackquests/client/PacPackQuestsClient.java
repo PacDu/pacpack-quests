@@ -155,5 +155,18 @@ public class PacPackQuestsClient implements ClientModInitializer {
                 questScreen.renameCategory(payload.categoryOld(), payload.categoryNew());
             }
         }));
+
+        ClientPlayNetworking.registerGlobalReceiver(QuestCompletedPayload.ID, (payload, context) -> {
+            // Always execute UI tasks on the main client thread
+            context.client().execute(() -> {
+                // Fetch the quest data from the client's memory
+                QuestDefinition quest = PacPackQuestsClient.CLIENT_DEFINITIONS.get(payload.questId());
+
+                if (quest != null) {
+                    // Add our custom toast to the vanilla ToastManager queue!
+                    context.client().getToastManager().add(new QuestCompletedToast(quest));
+                }
+            });
+        });
 	}
 }

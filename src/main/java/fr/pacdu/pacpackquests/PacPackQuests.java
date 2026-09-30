@@ -56,6 +56,7 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(EditCategoryPayload.ID, EditCategoryPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(QuestCompletedPayload.ID, QuestCompletedPayload.CODEC);
 
 		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
