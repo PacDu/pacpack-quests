@@ -32,6 +32,7 @@ public class SelectionScreen extends Screen {
     private final List<String> allEntries = new ArrayList<>();
     private final List<String> filteredEntries = new ArrayList<>();
 
+    private boolean isDraggingScrollbar = false;
     private int scrollOffset = 0;
     private final int columns = 9;
     private final int rows = 5;
@@ -169,11 +170,26 @@ public class SelectionScreen extends Screen {
             context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
         }
 
-        // Scrollbar Indicator
+        // --- Scrollbar Render ---
         int maxScroll = Math.max(0, (filteredEntries.size() - maxVisible + columns - 1) / columns);
         if (maxScroll > 0) {
-            String scrollText = (scrollOffset + 1) + " / " + (maxScroll + 1);
-            context.drawText(this.textRenderer, scrollText, startX + (columns * 18) + 10, startY + (rows * 18) / 2, 0xFFAAAAAA, false);
+            int scrollX = startX + (columns * 18) + 5; // Placed 5 pixels to the right of the grid
+            int scrollHeight = rows * 18;
+            int thumbHeight = 15; // Fixed height for the draggable thumb
+
+            // 1. Draw the background track (dark gray/black)
+            context.fill(scrollX, startY, scrollX + 6, startY + scrollHeight, 0xFF000000);
+
+            // 2. Calculate the Y position of the thumb based on the current scroll
+            float scrollRatio = (float) scrollOffset / maxScroll;
+            int thumbY = startY + (int) (scrollRatio * (scrollHeight - thumbHeight));
+
+            // 3. Determine thumb color (White if hovered/dragged, otherwise Light Gray)
+            boolean isHoveringThumb = mouseX >= scrollX && mouseX <= scrollX + 6 && mouseY >= thumbY && mouseY <= thumbY + thumbHeight;
+            int thumbColor = (this.isDraggingScrollbar || isHoveringThumb) ? 0xFFFFFFFF : 0xFFAAAAAA;
+
+            // 4. Draw the thumb
+            context.fill(scrollX, thumbY, scrollX + 6, thumbY + thumbHeight, thumbColor);
         }
     }
 
@@ -182,7 +198,21 @@ public class SelectionScreen extends Screen {
         if (click.button() == 0) { // Left click
             int startX = (this.width - (columns * 18)) / 2;
             int startY = 50;
+            int maxScroll = Math.max(0, (filteredEntries.size() - maxVisible + columns - 1) / columns);
 
+            // 1. Check if the user clicked on the scrollbar track
+            if (maxScroll > 0) {
+                int scrollX = startX + (columns * 18) + 5;
+                int scrollHeight = rows * 18;
+
+                if (click.x() >= scrollX && click.x() <= scrollX + 6 && click.y() >= startY && click.y() <= startY + scrollHeight) {
+                    this.isDraggingScrollbar = true;
+                    this.updateScrollPositionFromMouse(click.y(), startY, scrollHeight, maxScroll);
+                    return true;
+                }
+            }
+
+            // 2. Normal Grid Click Logic
             for (int i = 0; i < maxVisible; i++) {
                 int dataIndex = (scrollOffset * columns) + i;
                 if (dataIndex >= filteredEntries.size()) break;
@@ -210,6 +240,46 @@ public class SelectionScreen extends Screen {
         scrollOffset -= (int) Math.signum(verticalAmount);
         scrollOffset = Math.clamp(scrollOffset, 0, maxScroll);
         return true;
+    }
+
+    @Override
+    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+        // If the player is currently dragging the scrollbar, update the scroll offset
+        if (this.isDraggingScrollbar) {
+            int startY = 50;
+            int scrollHeight = rows * 18;
+            int maxScroll = Math.max(0, (filteredEntries.size() - maxVisible + columns - 1) / columns);
+
+            this.updateScrollPositionFromMouse(click.y(), startY, scrollHeight, maxScroll);
+            return true;
+        }
+        return super.mouseDragged(click, offsetX, offsetY);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+        // Stop dragging when the mouse button is released
+        if (click.button() == 0 && this.isDraggingScrollbar) {
+            this.isDraggingScrollbar = false;
+            return true;
+        }
+        return super.mouseReleased(click);
+    }
+
+    // Helper method to calculate which row should be displayed based on the mouse's vertical position
+    private void updateScrollPositionFromMouse(double mouseY, int startY, int scrollHeight, int maxScroll) {
+        int thumbHeight = 15;
+        // Center the mathematical point on the middle of the thumb for a natural feel
+        double adjustedY = mouseY - startY - (thumbHeight / 2.0);
+
+        // Calculate the percentage of the scroll (0.0 to 1.0)
+        double ratio = adjustedY / (scrollHeight - thumbHeight);
+
+        // Ensure the ratio stays within valid bounds to prevent crashing or scrolling out of bounds
+        ratio = Math.clamp(ratio, 0.0, 1.0);
+
+        // Apply the ratio to the max scroll to get the current offset row
+        this.scrollOffset = (int) Math.round(ratio * maxScroll);
     }
 
     @Override
