@@ -389,6 +389,9 @@ public class PacPackQuests implements ModInitializer {
             try {
                 if (!Files.exists(categoryDir)) {
                     Files.createDirectories(categoryDir);
+
+                    ModConfig.categoryOrder.add(payload.category());
+                    ModConfig.save();
                 }
 
                 context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new CreateCategoryPayload(payload.category())));
@@ -411,6 +414,9 @@ public class PacPackQuests implements ModInitializer {
                         for (File file : files) file.delete();
                     }
                     dir.delete();
+
+                    ModConfig.categoryOrder.remove(payload.category());
+                    ModConfig.save();
                 }
 
                 QuestManager.LOADED_QUESTS.values().removeIf(quest -> quest.category().equals(categoryToDelete));

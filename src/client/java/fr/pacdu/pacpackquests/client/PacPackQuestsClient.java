@@ -68,10 +68,15 @@ public class PacPackQuestsClient implements ClientModInitializer {
                 }
             }
 
-            // --- CONFIG-BASED SORTING ---
-            // Replace ModConfig.categoryOrder with the actual variable from your config file
             List<String> configuredOrder = ModConfig.categoryOrder;
 
+            for (String category : configuredOrder) {
+                if (!CLIENT_CATEGORIES.contains(category)) {
+                    CLIENT_CATEGORIES.add(category);
+                }
+            }
+
+            // --- CONFIG-BASED SORTING ---
             CLIENT_CATEGORIES.sort((cat1, cat2) -> {
                 int index1 = configuredOrder.indexOf(cat1);
                 int index2 = configuredOrder.indexOf(cat2);

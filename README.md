@@ -1,13 +1,16 @@
 # PacPack Quests
 
-PacPack Quests is a lightweight questing mod for Fabric 1.21.11. It features a fully integrated in-game visual editor, allowing modpack creators and server admins to build, edit, and organize drag-and-drop quest trees directly in the game without ever touching a configuration file.
+PacPack Quests is a modern, lightweight questing mod for Fabric 1.21.11. It features a fully integrated in-game visual editor, allowing modpack creators and server admins to build, edit, and organize drag-and-drop quest trees directly in the game without ever touching a configuration file.
+
+![Main Interface Preview](https://cdn.modrinth.com/data/cached_images/47bbde3996755fb9df989c9d1018431cc6a608fb.jpeg)
 
 ## ✨ Features
 
-* **In-Game Visual Editor:** Create, move, and edit quests via a canvas-based GUI.
-* **Drag-and-Drop Organization:** Seamlessly reorder categories and arrange quest nodes.
+* **In-Game Visual Editor:** Create, move, and edit quests via a canvas-based GUI with directional chevron arrows to clearly indicate quest flow.
+* **Interactive Selection Menu:** Browse, search, and select items, blocks, mobs, biomes, and structures from a paginated visual grid, sorted exactly like the vanilla creative menu.
+* **Exploration Quests:** Send players on adventures by requiring them to discover specific biomes, structures, or dimensions (optimized at 4Hz to ensure server performance).
+* **Smart UI & Camera:** The dynamic camera automatically restricts panning to the active quest tree so players never get lost in the void, while grid-snapping and spiral-search algorithms prevent overlapping quests.
 * **Multiplayer Synchronization:** Full client-server sync. Edit quests live on your server, and all connected players will see the updates instantly.
-* **Smart Validation:** Built-in error checking prevents typos and invalid item IDs from breaking your quests.
 * **Custom Categories:** Group your quests into tabs (e.g., Magic, Tech, Exploration).
 
 ## 🚀 Getting Started
@@ -19,22 +22,19 @@ To modify quests, you must be a Server Operator (Permission Level 2 / Gamemaster
 
 ## 📝 Quest Creation Guide (Mini-Tutorial)
 
-When you right-click to create or edit a quest, you will see a form. Here is exactly what is accepted in each field:
+When you right-click to create or edit a quest, you will see a form. Thanks to the in-game Selection Menu, configuration is entirely point-and-click:
 
-* **Quest ID:** The unique internal identifier. *Accepted:* Lowercase letters, numbers, and underscores only (e.g., `getting_started`, `mine_10_iron`). Cannot be changed once created.
+* **Quest ID:** The unique internal identifier. *Accepted:* Lowercase letters, numbers, and underscores only (e.g., `getting_started`). Cannot be changed once created.
 * **Title:** The display name of the quest. *Accepted:* Any text.
-* **Task Type:** Toggle between `MINE_BLOCK`, `CRAFT_ITEM`, and `KILL_MOB`.
-* **Task Target:** The specific block, item, or entity to interact with.
-    * *Single Item/Mob:* Use the exact registry name (e.g., `minecraft:stone` or `minecraft:zombie`).
-    * *Group/Tag:* Use a hashtag to target any item in a group (e.g., `#minecraft:logs` or `#c:ores`).
-* **Required Amount:** The number of times the task must be completed. *Accepted:* Numbers > 0.
-* **Icon Item ID:** The item displayed on the quest node. *Accepted:* Valid Minecraft item IDs (e.g., `minecraft:diamond_pickaxe`).
+* **Task Type:** Toggle between `MINE_BLOCK`, `CRAFT_ITEM`, `KILL_MOB`, `EXPLORE_BIOME`, `EXPLORE_STRUCTURE`, and `EXPLORE_DIMENSION`.
+* **Task Target:** Click the button to open the Selection Menu. Search for the exact block, entity, biome, or structure you need.
+  * *Tags:* You can also search for and select groups (Tags) identified by a yellow `#` (e.g., `#minecraft:logs`).
+* **Required Amount:** The number of times the task must be completed (or set to `1` for exploration). *Accepted:* Numbers > 0.
+* **Icon:** Click to open the Selection Menu and pick the item displayed on the quest node.
 * **Reward Type:** Toggle between `ITEM`, `XP`, and `LEVEL`.
-* **Reward Target:** If the type is `ITEM`, enter the item ID here. Ignored for XP/Levels.
+* **Reward Item:** If the type is `ITEM`, click to select the reward from the grid. Ignored for XP/Levels.
 * **Reward Amount:** The quantity of the item, or the amount of XP/Levels given. *Accepted:* Numbers > 0.
-* **Parents (Comma separated):** Quest IDs that must be completed before this one unlocks. *Accepted:* Existing quest IDs separated by commas (e.g., `quest_1, quest_2`). Leave blank for starting quests.
-
-> **💡 Pro-Tip for finding IDs:** Press **`F3 + H`** in-game to enable Advanced Tooltips. Hovering over any item in your inventory will reveal its exact registry name (e.g., `minecraft:apple`). You can also browse a complete list of vanilla IDs in the [Minecraft Wiki](https://minecraft.wiki/w/Tag_(Java_Edition)#List_of_tag_types).
+* **Parents (Comma separated):** Quest IDs that must be completed before this one unlocks (e.g., `quest_1, quest_2`). Leave blank for starting quests.
 
 ## 📂 Configuration Architecture
 
@@ -49,11 +49,5 @@ config/pacpackquests/
     ├── main/                      <-- A category folder
     │   ├── getting_started.json   <-- Individual quest data
     │   └── craft_pickaxe.json
-    └── nether/                    <-- Another category folder
-        └── enter_nether.json
-```
-
-*Note: If you manually edit the JSON files while the server is running, you will need to restart the server or rely on the in-game editor to overwrite changes. The in-game editor updates the server RAM and JSON files simultaneously.*
-
-## 🔮 Future Evolutions
-PacPack Quests is still in development. Future updates plan to expand the task variety (e.g., location-based tasks), introduce new reward choices (such as pool table), and maybe revamp the interface.
+    └── exploration/               <-- Another category folder
+        └── find_village.json
