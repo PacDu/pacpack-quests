@@ -134,6 +134,7 @@ public class EditQuestScreen extends Screen {
             int nextOrdinal = (currentTaskType.ordinal() + 1) % TaskType.values().length;
             currentTaskType = TaskType.values()[nextOrdinal];
             button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + currentTaskType.name()));
+            this.reqAmountField.setEditable(currentTaskType != TaskType.EXPLORE_DIMENSION && currentTaskType != TaskType.EXPLORE_BIOME);
         }).dimensions(col1, y, fieldWidth, 20).build());
 
         this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + currentRewardType.name()), button -> {
@@ -157,6 +158,11 @@ public class EditQuestScreen extends Screen {
             this.client.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedTarget = result;
                 this.targetButton.setMessage(Text.literal(formatDisplayString(result)));
+
+                // If the task target is a biome or a dimension, set the required amount to 1
+                if (currentTaskType == TaskType.EXPLORE_DIMENSION || currentTaskType == TaskType.EXPLORE_BIOME) {
+                    this.reqAmountField.setText("1");
+                }
             }));
         }).dimensions(col1, y, fieldWidth, 20).build();
         this.addDrawableChild(this.targetButton);

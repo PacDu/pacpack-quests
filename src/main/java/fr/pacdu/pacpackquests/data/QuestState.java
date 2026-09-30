@@ -8,17 +8,17 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
 import net.minecraft.world.World;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
 
+import java.util.*;
 
 public class QuestState extends PersistentState {
 
     // Structure: Player UUID -> (Quest ID -> Value)
     public final Map<UUID, Map<String, Integer>> progress = new HashMap<>();
     public final Map<UUID, Map<String, Boolean>> claimed = new HashMap<>();
+
+    // Structure: Player UUID -> (Quest ID -> Set of discovered ChunkPos as Longs)
+    public final Map<UUID, Map<String, Set<Long>>> discoveredStructures = new HashMap<>();
 
     public int getProgress(UUID player, String questId) {
         return progress.getOrDefault(player, new HashMap<>()).getOrDefault(questId, 0);
@@ -31,8 +31,8 @@ public class QuestState extends PersistentState {
 
     public boolean isFinished(UUID player, String questId) {
         QuestDefinition quest = QuestManager.LOADED_QUESTS.get(questId);
-        int progress = getProgress(player, quest.id());
-        return progress >= quest.requiredAmount();
+        int currentProgress = getProgress(player, quest.id());
+        return currentProgress >= quest.requiredAmount();
     }
 
     public boolean isClaimed(UUID player, String questId) {
@@ -44,6 +44,22 @@ public class QuestState extends PersistentState {
         this.markDirty();
     }
 
+    // --- New Methods for Structure Tracking ---
+
+    public boolean hasDiscoveredStructure(UUID player, String questId, long chunkPosLong) {
+        return discoveredStructures.getOrDefault(player, new HashMap<>())
+                .getOrDefault(questId, new HashSet<>())
+                .contains(chunkPosLong);
+    }
+
+    public void addDiscoveredStructure(UUID player, String questId, long chunkPosLong) {
+        discoveredStructures
+                .computeIfAbsent(player, k -> new HashMap<>())
+                .computeIfAbsent(questId, k -> new HashSet<>())
+                .add(chunkPosLong);
+        this.markDirty();
+    }
+
     // 1. Define the Codec
     public static final Codec<QuestState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             // Serialize the progress map
@@ -52,10 +68,17 @@ public class QuestState extends PersistentState {
 
             // Serialize the claimed rewards map
             Codec.unboundedMap(Codec.STRING, Codec.unboundedMap(Codec.STRING, Codec.BOOL))
-                    .fieldOf("claimed").forGetter(QuestState::getClaimedMapAsString)
+                    .fieldOf("claimed").forGetter(QuestState::getClaimedMapAsString),
+
+            // Serialize the discovered structures map
+            // We use optionalFieldOf to prevent crashing when loading old saves that don't have this data yet
+            Codec.unboundedMap(Codec.STRING, Codec.unboundedMap(Codec.STRING, Codec.list(Codec.LONG)))
+                    .optionalFieldOf("discovered_structures", new HashMap<>()).forGetter(QuestState::getDiscoveredStructuresMapAsString)
+
     ).apply(instance, QuestState::createFromMaps));
 
-    // 2. Helper methods to convert UUIDs to Strings for the Codec
+
+    // 2. Helper methods to convert UUIDs and Sets to Strings/Lists for the Codec
     private Map<String, Map<String, Integer>> getProgressMapAsString() {
         Map<String, Map<String, Integer>> result = new HashMap<>();
         this.progress.forEach((uuid, map) -> result.put(uuid.toString(), map));
@@ -68,14 +91,38 @@ public class QuestState extends PersistentState {
         return result;
     }
 
-    private static QuestState createFromMaps(Map<String, Map<String, Integer>> progressMap, Map<String, Map<String, Boolean>> claimedMap) {
+    private Map<String, Map<String, List<Long>>> getDiscoveredStructuresMapAsString() {
+        Map<String, Map<String, List<Long>>> result = new HashMap<>();
+        this.discoveredStructures.forEach((uuid, map) -> {
+            Map<String, List<Long>> listMap = new HashMap<>();
+            // Codec handles Lists better than Sets, so we convert them for saving
+            map.forEach((questId, set) -> listMap.put(questId, new ArrayList<>(set)));
+            result.put(uuid.toString(), listMap);
+        });
+        return result;
+    }
+
+    // Updated factory method to include the third map
+    private static QuestState createFromMaps(
+            Map<String, Map<String, Integer>> progressMap,
+            Map<String, Map<String, Boolean>> claimedMap,
+            Map<String, Map<String, List<Long>>> discoveredMap) {
+
         QuestState state = new QuestState();
         progressMap.forEach((uuid, map) -> state.progress.put(UUID.fromString(uuid), new HashMap<>(map)));
         claimedMap.forEach((uuid, map) -> state.claimed.put(UUID.fromString(uuid), new HashMap<>(map)));
+
+        // Convert the Lists back to Sets for runtime memory efficiency
+        discoveredMap.forEach((uuid, map) -> {
+            Map<String, Set<Long>> setMap = new HashMap<>();
+            map.forEach((questId, list) -> setMap.put(questId, new HashSet<>(list)));
+            state.discoveredStructures.put(UUID.fromString(uuid), setMap);
+        });
+
         return state;
     }
 
-    // 3. Global accessor for server state, using the new Codec system
+    // 3. Global accessor for server state
     private static final PersistentStateType<QuestState> TYPE = new PersistentStateType<>(
             "pacpackquests_data", // ID of the save file
             QuestState::new,      // Factory method
@@ -84,7 +131,6 @@ public class QuestState extends PersistentState {
     );
 
     public static QuestState getServerState(MinecraftServer server) {
-        // getOrCreate now only takes the TYPE as a single argument
         return Objects.requireNonNull(server.getWorld(World.OVERWORLD)).getPersistentStateManager().getOrCreate(TYPE);
     }
 }

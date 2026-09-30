@@ -25,6 +25,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.structure.StructureStart;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import org.slf4j.Logger;
@@ -188,17 +189,33 @@ public class PacPackQuests implements ModInitializer {
                             }
                         }
                         case EXPLORE_STRUCTURE -> {
-                            // Use getOrThrow() for dynamic registries in 1.21+
                             var structureRegistry = registryManager.getOrThrow(RegistryKeys.STRUCTURE);
+                            StructureStart structureStart = null;
+
                             if (isTag) {
                                 TagKey<net.minecraft.world.gen.structure.Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, targetId);
-                                if (world.getStructureAccessor().getStructureContaining(pos, tag).hasChildren()) {
-                                    requirementMet = true;
-                                }
+                                structureStart = world.getStructureAccessor().getStructureContaining(pos, tag);
                             } else {
                                 var structure = structureRegistry.get(targetId);
-                                // Check if the structure exists and if the player's current block is inside its bounding box
-                                if (structure != null && world.getStructureAccessor().getStructureContaining(pos, structure).hasChildren()) {
+                                if (structure != null) {
+                                    structureStart = world.getStructureAccessor().getStructureContaining(pos, structure);
+                                }
+                            }
+
+                            if (structureStart != null && structureStart.hasChildren()) {
+                                long structureUniqueId = structureStart.getPos().toLong();
+
+                                // 1. Load the global quest state
+                                QuestState state = QuestState.getServerState(server);
+                                UUID playerUuid = player.getUuid();
+
+                                // 2. Check if the player hasn't already discovered this exact structure instance
+                                if (!state.hasDiscoveredStructure(playerUuid, quest.id(), structureUniqueId)) {
+
+                                    // 3. Register the structure in the player's save file
+                                    state.addDiscoveredStructure(playerUuid, quest.id(), structureUniqueId);
+
+                                    // 4. Increment quest progress by 1
                                     requirementMet = true;
                                 }
                             }
