@@ -75,13 +75,13 @@ public class EditQuestScreen extends Screen {
         String initialRewAmt = "1";
         String initialParents = "";
 
-        // 1. On charge les données de la mémoire si on édite une quête
+        // 1. Load data from memory if we are editing a quest
         if (questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) {
             QuestDefinition def = PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
             initialTitle = def.title();
             this.currentTaskType = def.type();
 
-            // On ne met à jour ces variables que si elles sont vides (pour ne pas écraser un retour de SelectionScreen)
+            // Only update these variables if they are empty (to avoid overwriting SelectionScreen callbacks)
             if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
             if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = Registries.ITEM.getId(def.icon().getItem()).toString();
 
@@ -94,7 +94,7 @@ public class EditQuestScreen extends Screen {
             if (def.parents() != null) initialParents = String.join(",", def.parents());
         }
 
-        // 2. LA MAGIE ICI : On écrase les valeurs initiales par ce qui est actuellement tapé dans les champs (s'ils existent déjà)
+        // 2. Override initial values with current field contents (if they exist)
         String currentId = this.idField != null ? this.idField.getText() : "";
         if (this.titleField != null) initialTitle = this.titleField.getText();
         if (this.reqAmountField != null) initialReqAmt = this.reqAmountField.getText();
@@ -107,7 +107,7 @@ public class EditQuestScreen extends Screen {
             this.idField.setText(questId);
             this.idField.setEditable(false);
         } else {
-            // On restaure l'ID tapé lors de la création d'une nouvelle quête
+            // Restore the ID typed during the creation of a new quest
             this.idField.setText(currentId);
             this.idField.setTextPredicate(text -> text.matches("^[a-z0-9_]*$"));
             this.idField.setPlaceholder(Text.translatable("form.pacpack-quests.quest_id_placeholder").formatted(Formatting.DARK_GRAY));
@@ -455,10 +455,10 @@ public class EditQuestScreen extends Screen {
             
             // outline
             int totalWidth = maxScroll > 0 ? dropWidth + 6 : dropWidth;
-            context.fill(dropX - 1, dropY - 1, dropX + totalWidth + 1, dropY, 0xFFAAAAAA); // top
-            context.fill(dropX - 1, dropY + dropHeight, dropX + totalWidth + 1, dropY + dropHeight + 1, 0xFFAAAAAA); // bottom
-            context.fill(dropX - 1, dropY, dropX, dropY + dropHeight, 0xFFAAAAAA); // left
-            context.fill(dropX + totalWidth, dropY, dropX + totalWidth + 1, dropY + dropHeight, 0xFFAAAAAA); // right
+            context.fill(dropX - 1, dropY - 1, dropX + totalWidth + 1, dropY, 0xFFAAAAAA);
+            context.fill(dropX - 1, dropY + dropHeight, dropX + totalWidth + 1, dropY + dropHeight + 1, 0xFFAAAAAA);
+            context.fill(dropX - 1, dropY, dropX, dropY + dropHeight, 0xFFAAAAAA);
+            context.fill(dropX + totalWidth, dropY, dropX + totalWidth + 1, dropY + dropHeight, 0xFFAAAAAA);
 
             for (int i = 0; i < visibleOptions; i++) {
                 int dataIndex = this.taskDropdownScroll + i;

@@ -20,6 +20,10 @@ import java.util.*;
 import java.util.stream.Stream;
 import java.io.InputStreamReader;
 
+/**
+ * Handles the loading and management of quest definitions from JSON files on the server.
+ * Quests are loaded from the config directory and stored in memory.
+ */
 public class QuestManager {
 
     public static final Map<String, QuestDefinition> LOADED_QUESTS = new HashMap<>();

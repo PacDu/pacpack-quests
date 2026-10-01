@@ -14,6 +14,10 @@ import net.minecraft.world.World;
 
 import java.util.*;
 
+/**
+ * Represents the persistent save data for all players' quest progress.
+ * This state is saved to the world's data folder (data/pacpackquests_data.dat).
+ */
 public class QuestState extends PersistentState {
 
     // Structure: Player UUID -> (Quest ID -> Value)

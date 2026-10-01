@@ -309,7 +309,7 @@ public class SelectionScreen extends Screen {
             case BLOCK -> {
                 if (isTag) yield Items.NAME_TAG.getDefaultStack();
                 var blockItem = Registries.BLOCK.get(id).asItem();
-                // Si le bloc n'a pas d'item associé (ex: l'eau, le feu), on affiche une barrière
+                // If the block has no associated item (e.g. water, fire), display a barrier
                 yield blockItem != Items.AIR ? blockItem.getDefaultStack() : Items.BARRIER.getDefaultStack();
             }
             case MOB -> {

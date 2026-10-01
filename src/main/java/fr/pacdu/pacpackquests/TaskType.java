@@ -3,6 +3,10 @@ package fr.pacdu.pacpackquests;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Defines the different types of tasks a player can complete in a quest.
+ * These types determine how progress is tracked (e.g., inventory tracking vs event listening).
+ */
 public enum TaskType {
     MINE_BLOCK,
     KILL_MOB,

@@ -38,6 +38,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Main entry point for the PacPack Quests mod on the server side.
+ * Handles initialization, config loading, quest loading, event registration, and synchronization.
+ */
 public class PacPackQuests implements ModInitializer {
 
 	public static final String MOD_ID = "PacPackQuests";
