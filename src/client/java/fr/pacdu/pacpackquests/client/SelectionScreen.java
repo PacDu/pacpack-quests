@@ -1,5 +1,6 @@
 package fr.pacdu.pacpackquests.client;
 
+import fr.pacdu.pacpackquests.util.RegistryType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
@@ -20,12 +21,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static fr.pacdu.pacpackquests.util.TranslationUtils.getTranslatedName;
+
 public class SelectionScreen extends Screen {
 
     public enum SelectionContext { ITEM, BLOCK, MOB, BIOME, STRUCTURE, DIMENSION }
 
     private final Screen parent;
-    private final SelectionContext contextType;
+    private final RegistryType contextType;
     private final Consumer<String> onSelected;
 
     private TextFieldWidget searchBox;
@@ -38,7 +41,7 @@ public class SelectionScreen extends Screen {
     private final int rows = 5;
     private final int maxVisible = columns * rows; // 45 items per page
 
-    public SelectionScreen(Screen parent, SelectionContext contextType, Consumer<String> onSelected) {
+    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected) {
         super(Text.translatable("gui.pacpack-quests.select_element"));
         this.parent = parent;
         this.contextType = contextType;
@@ -116,7 +119,7 @@ public class SelectionScreen extends Screen {
 
         for (String entry : allEntries) {
             // Check against the raw ID or the translated name
-            if (entry.toLowerCase().contains(lowerQuery) || getTranslatedName(entry).toLowerCase().contains(lowerQuery)) {
+            if (entry.toLowerCase().contains(lowerQuery) || getTranslatedName(entry, this.contextType).toLowerCase().contains(lowerQuery)) {
                 filteredEntries.add(entry);
             }
         }
@@ -165,7 +168,7 @@ public class SelectionScreen extends Screen {
         // Draw Tooltip on top of everything
         if (hoveredEntry != null) {
             List<Text> tooltip = new ArrayList<>();
-            tooltip.add(Text.literal(getTranslatedName(hoveredEntry)).formatted(Formatting.GOLD));
+            tooltip.add(Text.literal(getTranslatedName(hoveredEntry, this.contextType)).formatted(Formatting.GOLD));
             tooltip.add(Text.literal(hoveredEntry).formatted(Formatting.DARK_GRAY));
             context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
         }
@@ -322,29 +325,6 @@ public class SelectionScreen extends Screen {
             case BIOME -> Items.GRASS_BLOCK.getDefaultStack();
             case STRUCTURE -> Items.CHEST.getDefaultStack();
             case DIMENSION -> Items.OBSIDIAN.getDefaultStack();
-        };
-    }
-
-    private String getTranslatedName(String entryId) {
-        boolean isTag = entryId.startsWith("#");
-        String rawId = isTag ? entryId.substring(1) : entryId;
-        Identifier id = Identifier.tryParse(rawId);
-
-        if (id == null) return entryId;
-
-        if (isTag) {
-            String path = id.getPath();
-            return "Any " + path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
-        }
-
-        return switch (this.contextType) {
-            case ITEM -> Registries.ITEM.containsId(id) ? Registries.ITEM.get(id).getName().getString() : rawId;
-            case BLOCK -> Registries.BLOCK.containsId(id) ? Registries.BLOCK.get(id).getName().getString() : rawId;
-            case MOB -> Registries.ENTITY_TYPE.containsId(id) ? Registries.ENTITY_TYPE.get(id).getName().getString() : rawId;
-            default -> {
-                String path = id.getPath();
-                yield path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
-            }
         };
     }
 

@@ -5,6 +5,7 @@ import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.SaveQuestPayload;
+import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
@@ -21,6 +22,8 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
+
+import static fr.pacdu.pacpackquests.util.TranslationUtils.getTranslatedName;
 
 public class EditQuestScreen extends Screen {
 
@@ -114,10 +117,10 @@ public class EditQuestScreen extends Screen {
         }
         this.addDrawableChild(this.idField);
 
-        this.iconButton = ButtonWidget.builder(Text.literal(formatDisplayString(selectedIcon)), button -> {
-            this.client.setScreen(new SelectionScreen(this, SelectionScreen.SelectionContext.ITEM, result -> {
+        this.iconButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(selectedIcon, RegistryType.ITEM))), button -> {
+            this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
                 this.selectedIcon = result;
-                this.iconButton.setMessage(Text.literal(formatDisplayString(result)));
+                this.iconButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
             }));
         }).dimensions(col2, y, fieldWidth, 20).build();
         this.addDrawableChild(this.iconButton);
@@ -150,26 +153,26 @@ public class EditQuestScreen extends Screen {
 
         // ROW 4: Target Button & Reward Button
         y += yStep;
-        this.targetButton = ButtonWidget.builder(Text.literal(formatDisplayString(selectedTarget)), button -> {
-            SelectionScreen.SelectionContext ctx = switch (currentTaskType) {
-                case MINE_BLOCK -> SelectionScreen.SelectionContext.BLOCK;
-                case CRAFT_ITEM, OBTAIN_ITEM -> SelectionScreen.SelectionContext.ITEM;
-                case KILL_MOB -> SelectionScreen.SelectionContext.MOB;
-                case EXPLORE_BIOME -> SelectionScreen.SelectionContext.BIOME;
-                case EXPLORE_STRUCTURE -> SelectionScreen.SelectionContext.STRUCTURE;
-                case EXPLORE_DIMENSION -> SelectionScreen.SelectionContext.DIMENSION;
+        this.targetButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(selectedTarget, RegistryType.ITEM))), button -> {
+            RegistryType ctx = switch (currentTaskType) {
+                case MINE_BLOCK -> RegistryType.BLOCK;
+                case CRAFT_ITEM, OBTAIN_ITEM -> RegistryType.ITEM;
+                case KILL_MOB -> RegistryType.MOB;
+                case EXPLORE_BIOME -> RegistryType.BIOME;
+                case EXPLORE_STRUCTURE -> RegistryType.STRUCTURE;
+                case EXPLORE_DIMENSION -> RegistryType.DIMENSION;
             };
             this.client.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedTarget = result;
-                this.targetButton.setMessage(Text.literal(formatDisplayString(result)));
+                this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
             }));
         }).dimensions(col1, y, fieldWidth, 20).build();
         this.addDrawableChild(this.targetButton);
 
-        this.rewardButton = ButtonWidget.builder(Text.literal(formatDisplayString(selectedReward)), button -> {
-            this.client.setScreen(new SelectionScreen(this, SelectionScreen.SelectionContext.ITEM, result -> {
+        this.rewardButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(selectedReward, RegistryType.ITEM))), button -> {
+            this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
                 this.selectedReward = result;
-                this.rewardButton.setMessage(Text.literal(formatDisplayString(result)));
+                this.rewardButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
             }));
         }).dimensions(col2, y, fieldWidth, 20).build();
         this.rewardButton.active = (currentRewardType == RewardType.ITEM);
