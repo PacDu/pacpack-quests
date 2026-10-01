@@ -13,6 +13,7 @@
   "gui.pacpack-quests.explore_biome": "Explore",
   "gui.pacpack-quests.explore_structure": "Explore",
   "gui.pacpack-quests.explore_dimension": "Explore",
+  "gui.pacpack-quests.obtain_item": "Obtain",
   "gui.pacpack-quests.status": "Status",
   "gui.pacpack-quests.ready_to_claim": "Ready to Claim!",
   "gui.pacpack-quests.completed": "Completed",
@@ -50,6 +51,14 @@
   "form.pacpack-quests.reward_item": "Reward Item",
   "form.pacpack-quests.required_amount": "Required Amount",
   "form.pacpack-quests.reward_amount": "Reward Amount",
+
+  "task.pacpack-quests.mine_block": "Mine Block",
+  "task.pacpack-quests.kill_mob": "Kill Mob",
+  "task.pacpack-quests.craft_item": "Craft Item",
+  "task.pacpack-quests.explore_biome": "Explore Biome",
+  "task.pacpack-quests.explore_structure": "Explore Structure",
+  "task.pacpack-quests.explore_dimension": "Explore Dimension",
+  "task.pacpack-quests.obtain_item": "Obtain Item",
 
   "error.pacpack-quests.invalid_id": "Invalid ID! Use only lowercase letters, numbers, and underscores.",
   "error.pacpack-quests.id_already_exists": "This Quest ID already exists!",
