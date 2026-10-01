@@ -150,7 +150,7 @@ public class EditQuestScreen extends Screen {
         this.targetButton = ButtonWidget.builder(Text.literal(formatDisplayString(selectedTarget)), button -> {
             SelectionScreen.SelectionContext ctx = switch (currentTaskType) {
                 case MINE_BLOCK -> SelectionScreen.SelectionContext.BLOCK;
-                case CRAFT_ITEM -> SelectionScreen.SelectionContext.ITEM;
+                case CRAFT_ITEM, OBTAIN_ITEM -> SelectionScreen.SelectionContext.ITEM;
                 case KILL_MOB -> SelectionScreen.SelectionContext.MOB;
                 case EXPLORE_BIOME -> SelectionScreen.SelectionContext.BIOME;
                 case EXPLORE_STRUCTURE -> SelectionScreen.SelectionContext.STRUCTURE;
@@ -222,7 +222,7 @@ public class EditQuestScreen extends Screen {
             if (id == null) return false;
             return switch (type) {
                 case MINE_BLOCK -> Registries.BLOCK.getOptional(TagKey.of(RegistryKeys.BLOCK, id)).isPresent();
-                case CRAFT_ITEM -> Registries.ITEM.getOptional(TagKey.of(RegistryKeys.ITEM, id)).isPresent();
+                case CRAFT_ITEM, OBTAIN_ITEM -> Registries.ITEM.getOptional(TagKey.of(RegistryKeys.ITEM, id)).isPresent();
                 case KILL_MOB -> Registries.ENTITY_TYPE.getOptional(TagKey.of(RegistryKeys.ENTITY_TYPE, id)).isPresent();
                 case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).getOptional(TagKey.of(RegistryKeys.BIOME, id)).isPresent();
                 case EXPLORE_STRUCTURE -> true;
@@ -233,7 +233,7 @@ public class EditQuestScreen extends Screen {
         if (id == null) return false;
         return switch (type) {
             case MINE_BLOCK -> Registries.BLOCK.containsId(id);
-            case CRAFT_ITEM -> Registries.ITEM.containsId(id);
+            case CRAFT_ITEM, OBTAIN_ITEM -> Registries.ITEM.containsId(id);
             case KILL_MOB -> Registries.ENTITY_TYPE.containsId(id);
             case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).containsId(id);
             case EXPLORE_STRUCTURE -> true;

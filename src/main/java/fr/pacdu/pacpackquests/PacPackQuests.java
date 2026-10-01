@@ -34,6 +34,8 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class PacPackQuests implements ModInitializer {
@@ -42,6 +44,8 @@ public class PacPackQuests implements ModInitializer {
 	// Initialize the SLF4J Logger with your Mod ID
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    private static final Map<UUID, Map<Identifier, Integer>> previousTickInventory = new HashMap<>();
 
 	@Override
 	public void onInitialize() {
@@ -162,6 +166,27 @@ public class PacPackQuests implements ModInitializer {
                 var world = player.getEntityWorld();
                 var registryManager = world.getRegistryManager();
 
+                Map<Identifier, Integer> currentInv = new HashMap<>();
+                for (int i = 0; i < player.getInventory().size(); i++) {
+                    net.minecraft.item.ItemStack stack = player.getInventory().getStack(i);
+                    if (!stack.isEmpty()) {
+                        Identifier id = Registries.ITEM.getId(stack.getItem());
+                        currentInv.put(id, currentInv.getOrDefault(id, 0) + stack.getCount());
+                    }
+                }
+
+                Map<Identifier, Integer> prevInv = previousTickInventory.computeIfAbsent(player.getUuid(), k -> new HashMap<>());
+                Map<Identifier, Integer> gainedItems = new HashMap<>();
+
+                for (Map.Entry<Identifier, Integer> entry : currentInv.entrySet()) {
+                    int current = entry.getValue();
+                    int previous = prevInv.getOrDefault(entry.getKey(), 0);
+                    if (current > previous) {
+                        gainedItems.put(entry.getKey(), current - previous);
+                    }
+                }
+                previousTickInventory.put(player.getUuid(), currentInv);
+
                 // Loop through all active quests
                 for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
 
@@ -176,6 +201,24 @@ public class PacPackQuests implements ModInitializer {
                     if (targetId == null) continue;
 
                     switch (quest.type()) {
+                        case OBTAIN_ITEM -> {
+                            if (!gainedItems.isEmpty()) {
+                                int gained = 0;
+                                if (isTag) {
+                                    TagKey<net.minecraft.item.Item> tagKey = TagKey.of(RegistryKeys.ITEM, targetId);
+                                    for (Map.Entry<Identifier, Integer> entry : gainedItems.entrySet()) {
+                                        if (Registries.ITEM.get(entry.getKey()).getDefaultStack().isIn(tagKey)) {
+                                            gained += entry.getValue();
+                                        }
+                                    }
+                                } else {
+                                    gained = gainedItems.getOrDefault(targetId, 0);
+                                }
+                                if (gained > 0) {
+                                    QuestProgressHandler.incrementProgress(player, quest, gained);
+                                }
+                            }
+                        }
                         case EXPLORE_DIMENSION -> {
                             if (world.getRegistryKey().getValue().equals(targetId)) {
                                 requirementMet = true;
