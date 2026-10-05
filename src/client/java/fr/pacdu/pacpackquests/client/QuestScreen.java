@@ -11,6 +11,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.resource.language.I18n;
 import net.minecraft.item.ItemStack;
@@ -50,6 +51,7 @@ public class QuestScreen extends Screen {
 	private String categoryClickTarget = null;
 	private String categoryEditTarget = null;
 	private String draggedCategory = null;
+	private final ScrollbarWidget categoryScrollbar = new ScrollbarWidget(0, 0, 6, 0, 25, true);
 
 	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) {}
 
@@ -161,13 +163,32 @@ public class QuestScreen extends Screen {
 		int tabX = startX - tabWidth;
 		int currentTabY = startY + 20;
 
+		int totalTabs = CLIENT_CATEGORIES.size() + (isEditMode ? 1 : 0);
+		double totalContentHeight = totalTabs * (tabHeight + 5);
+		double maxScroll = Math.max(0, totalContentHeight - (windowHeight - 20));
+		
+		int scrollX = isEditMode ? tabX - 35 : tabX - 10;
+		categoryScrollbar.setBounds(scrollX, startY + 20, 6, windowHeight - 20);
+		categoryScrollbar.setMaxScroll(maxScroll, this.height - 40);
+
+		double scrollAmount = categoryScrollbar.getScrollAmount();
 		int dropIndex = -1;
 		if (draggedCategory != null) {
-			dropIndex = Math.clamp((int) Math.round((mouseY - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
+			dropIndex = Math.clamp((int) Math.round((mouseY + scrollAmount - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
 		}
+
+		context.enableScissor(tabX - 40, startY + 20, startX, startY + windowHeight);
+		
+		context.getMatrices().translate(0f, (float)-scrollAmount);
 
 		int catIndex = 0;
 		for (String category : CLIENT_CATEGORIES) {
+			if (currentTabY + tabHeight < startY + 20 + scrollAmount || currentTabY > startY + windowHeight + scrollAmount) {
+				currentTabY += tabHeight + 5;
+				catIndex++;
+				continue;
+			}
+
 			// Draw the green insertion line
 			if (isEditMode && draggedCategory != null && dropIndex == catIndex) {
 				context.fill(tabX, currentTabY - 3, tabX + tabWidth, currentTabY - 1, 0xFF55FF55);
@@ -176,7 +197,7 @@ public class QuestScreen extends Screen {
 			// The original tab is not drawn if it is being moved
 			if (!category.equals(draggedCategory)) {
 				if (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget)) {
-					boolean isSelected = category.equals(selectedCategory) || isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
+					boolean isSelected = category.equals(selectedCategory) || isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, (int)(mouseY + scrollAmount));
 					context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
 					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
 				}
@@ -184,15 +205,15 @@ public class QuestScreen extends Screen {
 				if (isEditMode) {
 					int delBtnX = tabX - 14;
 					int delBtnY = currentTabY + 4;
-					boolean isHoverDelBtn = isHovering(delBtnX, delBtnY, 10, 10, mouseX, mouseY);
+					boolean isHoverDelBtn = isHovering(delBtnX, delBtnY, 10, 10, mouseX, (int)(mouseY + scrollAmount));
 					context.fill(delBtnX, delBtnY, delBtnX + 10, delBtnY + 10, isHoverDelBtn ? 0xFFCC1111 : 0xFF991111);
 					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("x").formatted(Formatting.BOLD), delBtnX + 5, delBtnY + 1, isHoverDelBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
 
 					int editBtnX = delBtnX - 14;
 					int editBtnY = currentTabY + 4;
-					boolean isHoverEditBtn = isHovering(editBtnX, editBtnY, 10, 10, mouseX, mouseY);
+					boolean isHoverEditBtn = isHovering(editBtnX, editBtnY, 10, 10, mouseX, (int)(mouseY + scrollAmount));
 					context.fill(editBtnX, editBtnY, editBtnX + 10, editBtnY + 10, isHoverEditBtn ? 0xFF666666 : 0xFF333333);
-					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("🖊").formatted(Formatting.BOLD), editBtnX + 5, editBtnY + 1, isHoverEditBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
+					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("\u270E").formatted(Formatting.BOLD), editBtnX + 5, editBtnY + 1, isHoverEditBtn ? 0xFFFFFFFF : 0xFFAAAAAA);
 				}
 			}
 			currentTabY += tabHeight + 5;
@@ -206,7 +227,7 @@ public class QuestScreen extends Screen {
 
 		// Draw the floating tab attached to the mouse
 		if (isEditMode && draggedCategory != null) {
-			int floatY = mouseY - tabHeight / 2;
+			int floatY = (int)(mouseY + scrollAmount) - tabHeight / 2;
 			context.fill(tabX, floatY, tabX + tabWidth, floatY + tabHeight, 0xFF888888);
 			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(draggedCategory.toUpperCase()), tabX + tabWidth / 2, floatY + 6, 0xFFFFFFFF);
 		}
@@ -214,11 +235,17 @@ public class QuestScreen extends Screen {
 		// --- ADD CATEGORY BUTTON / INLINE FIELD ---
 		if (isEditMode) {
 			if (!this.inlineCategoryField.isVisible() || this.categoryEditTarget != null) {
-				boolean isHover = isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, mouseY);
+				boolean isHover = isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, (int)(mouseY + scrollAmount));
 				context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isHover ? 0xFF666666 : 0xFF444444);
 				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("+").formatted(Formatting.BOLD), tabX + tabWidth / 2, currentTabY + 6, isHover ? 0xFFFFFFFF : 0xFFBBBBBB);
 			}
 		}
+
+		context.getMatrices().translate(0f, (float)scrollAmount);
+		context.disableScissor();
+
+		// --- CATEGORY SCROLLBAR ---
+		categoryScrollbar.render(context, mouseX, mouseY);
 
 		double localMouseX = (mouseX - startX - panX) / zoom;
 		double localMouseY = (mouseY - startY - panY) / zoom;
@@ -453,77 +480,90 @@ public class QuestScreen extends Screen {
 		boolean isMouseInWindow = mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight;
 
 		if (click.button() == 0) { // Left Click
+			if (categoryScrollbar.mouseClicked(mouseX, mouseY, click.button())) {
+				if (this.inlineCategoryField.isVisible()) {
+					this.inlineCategoryField.setVisible(false);
+					this.categoryEditTarget = null;
+				}
+				return true;
+			}
+
 			// Category tabs selection
 			int currentTabY = startY + 20;
-			for (String category : CLIENT_CATEGORIES) {
-				int tabX = startX - tabWidth;
+			double scrollAmount = categoryScrollbar.getScrollAmount();
+			double adjustedMouseY = mouseY + scrollAmount;
+			
+			if (mouseY >= startY + 20 && mouseY <= startY + windowHeight) {
+				for (String category : CLIENT_CATEGORIES) {
+					int tabX = startX - tabWidth;
 
-				// 1. Intercept the click on the delete button (red cross) or edit button (pen symbol)
-				if (isEditMode) {
-					int delBtnX = tabX - 14;
-					int delBtnY = currentTabY + 4;
-					if (mouseX >= delBtnX && mouseX <= delBtnX + 10 && mouseY >= delBtnY && mouseY <= delBtnY + 10) {
-						this.client.setScreen(new net.minecraft.client.gui.screen.ConfirmScreen(
-								confirmed -> {
-									if (confirmed) {
-										ClientPlayNetworking.send(new DeleteCategoryPayload(category));
-									}
-									this.client.setScreen(this);
-								},
-								Text.translatable("gui.pacpack-quests.delete_category_title"),
-								Text.translatable("gui.pacpack-quests.delete_category_desc").append(" " + category.toUpperCase() + " ?")
-						));
-						return true;
+					// 1. Intercept the click on the delete button (red cross) or edit button (pen symbol)
+					if (isEditMode) {
+						int delBtnX = tabX - 14;
+						int delBtnY = currentTabY + 4;
+						if (mouseX >= delBtnX && mouseX <= delBtnX + 10 && adjustedMouseY >= delBtnY && adjustedMouseY <= delBtnY + 10) {
+							this.client.setScreen(new net.minecraft.client.gui.screen.ConfirmScreen(
+									confirmed -> {
+										if (confirmed) {
+											ClientPlayNetworking.send(new DeleteCategoryPayload(category));
+										}
+										this.client.setScreen(this);
+									},
+									Text.translatable("gui.pacpack-quests.delete_category_title"),
+									Text.translatable("gui.pacpack-quests.delete_category_desc").append(" " + category.toUpperCase() + " ?")
+							));
+							return true;
+						}
+
+						int editBtnX = delBtnX - 14;
+						int editBtnY = currentTabY + 4;
+						if (mouseX >= editBtnX && mouseX <= editBtnX + 10 && adjustedMouseY >= editBtnY && adjustedMouseY <= editBtnY + 10) {
+							categoryEditTarget = category;
+							this.inlineCategoryField.setX(tabX);
+							this.inlineCategoryField.setY((int)(currentTabY - scrollAmount));
+							this.inlineCategoryField.setVisible(true);
+							this.setFocused(this.inlineCategoryField);
+							this.inlineCategoryField.setFocused(true);
+							return true;
+						}
 					}
 
-					int editBtnX = delBtnX - 14;
-					int editBtnY = currentTabY + 4;
-					if (mouseX >= editBtnX && mouseX <= editBtnX + 10 && mouseY >= editBtnY && mouseY <= editBtnY + 10) {
-						categoryEditTarget = category;
+					// 2. Normal click to change category OR prepare drag
+					if (mouseX >= tabX && mouseX <= tabX + tabWidth && adjustedMouseY >= currentTabY && adjustedMouseY <= currentTabY + tabHeight
+							&& (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget))) {
+						selectedCategory = category;
+
+						// Reset camera pos when refreshing or switching tabs
+						panX = 0;
+						panY = 0;
+
+						refreshQuests();
+						if (isEditMode) {
+							categoryClickTarget = category;
+						}
+						return true;
+					}
+					currentTabY += tabHeight + 5;
+				}
+
+				// + category tab button
+				if (isEditMode && (!this.inlineCategoryField.isVisible() || this.categoryEditTarget != null)) {
+					int tabX = startX - tabWidth;
+
+					if (mouseX >= tabX && mouseX <= tabX + tabWidth && adjustedMouseY >= currentTabY && adjustedMouseY <= currentTabY + tabHeight) {
+						this.categoryEditTarget = null;
 						this.inlineCategoryField.setX(tabX);
-						this.inlineCategoryField.setY(currentTabY);
+						this.inlineCategoryField.setY((int)(currentTabY - scrollAmount));
 						this.inlineCategoryField.setVisible(true);
 						this.setFocused(this.inlineCategoryField);
 						this.inlineCategoryField.setFocused(true);
 						return true;
 					}
 				}
-
-				// 2. Normal click to change category OR prepare drag
-				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= currentTabY && mouseY <= currentTabY + tabHeight
-						&& (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget))) {
-					selectedCategory = category;
-
-					// Reset camera pos when refreshing or switching tabs
-					panX = 0;
-					panY = 0;
-
-					refreshQuests();
-					if (isEditMode) {
-						categoryClickTarget = category;
-					}
-					return true;
-				}
-				currentTabY += tabHeight + 5;
-			}
-
-			// + category tab button
-			if (isEditMode && (!this.inlineCategoryField.isVisible() || this.categoryEditTarget != null)) {
-				int tabX = startX - tabWidth;
-				int plusButtonY = startY + 20 + CLIENT_CATEGORIES.size() * (tabHeight + 5);
-
-				if (mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= plusButtonY && mouseY <= plusButtonY + tabHeight) {
-					this.categoryEditTarget = null;
-					this.inlineCategoryField.setX(tabX);
-					this.inlineCategoryField.setY(plusButtonY);
-					this.inlineCategoryField.setVisible(true);
-					this.setFocused(this.inlineCategoryField);
-					this.inlineCategoryField.setFocused(true);
-					return true;
-				}
 			}
 		}
 
+		// Edit Mode Logic (Node interaction)
 		if (isEditMode && isMouseInWindow) {
 			if (click.button() == 0) { // Left Click: Pick up node to drag
 				for (QuestNode quest : questList) {
@@ -572,6 +612,14 @@ public class QuestScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+		if (categoryScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) {
+			if (this.inlineCategoryField != null && this.inlineCategoryField.isVisible()) {
+				this.inlineCategoryField.setVisible(false);
+				this.categoryEditTarget = null;
+			}
+			return true;
+		}
+
 		if (isEditMode && categoryClickTarget != null) {
 			draggedCategory = categoryClickTarget;
 			return true;
@@ -585,9 +633,7 @@ public class QuestScreen extends Screen {
 		if (click.x() >= startX && click.x() <= startX + windowWidth && click.y() >= startY && click.y() <= startY + windowHeight) {
 			panX += offsetX;
 			panY += offsetY;
-
 			clampPanning();
-
 			return true;
 		}
 		return super.mouseDragged(click, offsetX, offsetY);
@@ -595,11 +641,14 @@ public class QuestScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(Click click) {
+		if (categoryScrollbar.mouseReleased(click.x(), click.y(), click.button())) {
+			return true;
+		}
+		
 		categoryClickTarget = null; // Reset click target
 
 		if (isEditMode && draggedCategory != null && click.button() == 0) {
-			int dropIndex = Math.clamp((int) Math.round((click.y() - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
-
+			int dropIndex = Math.clamp((int) Math.round((click.y() + categoryScrollbar.getScrollAmount() - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
 			CLIENT_CATEGORIES.remove(draggedCategory);
 
 			// Using Math.clamp after subtraction prevents OutOfBounds errors
@@ -682,6 +731,16 @@ public class QuestScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		if (mouseX < startX) {
+			if (categoryScrollbar.mouseScrolled(mouseX, mouseY, verticalAmount)) {
+				if (this.inlineCategoryField != null && this.inlineCategoryField.isVisible()) {
+					this.inlineCategoryField.setVisible(false);
+					this.categoryEditTarget = null;
+				}
+				return true;
+			}
+		}
+
 		if (mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight) {
 			double oldZoom = zoom;
 			zoom += (float) (verticalAmount * 0.15f);

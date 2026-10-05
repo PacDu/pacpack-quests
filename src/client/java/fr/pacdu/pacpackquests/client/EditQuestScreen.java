@@ -39,8 +39,7 @@ public class EditQuestScreen extends Screen {
     private ButtonWidget targetButton, iconButton, rewardButton, taskTypeButton;
 
     private boolean isTaskDropdownOpen = false;
-    private int taskDropdownScroll = 0;
-    private boolean isDraggingDropdownScrollbar = false;
+    private fr.pacdu.pacpackquests.client.gui.ScrollbarWidget dropdownScrollbar = new fr.pacdu.pacpackquests.client.gui.ScrollbarWidget(0, 0, 6, 0, 1, true);
     private static final int MAX_DROPDOWN_VISIBLE = 4;
 
     // State variables holding the currently selected Strings
@@ -340,47 +339,23 @@ public class EditQuestScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (this.isTaskDropdownOpen) {
-            int maxScroll = Math.max(0, TaskType.values().length - MAX_DROPDOWN_VISIBLE);
-            if (maxScroll > 0) {
-                this.taskDropdownScroll -= (int) Math.signum(verticalAmount);
-                this.taskDropdownScroll = Math.clamp(this.taskDropdownScroll, 0, maxScroll);
-                return true;
-            }
-        }
+        if (this.isTaskDropdownOpen && dropdownScrollbar.mouseScrolled(mouseX, mouseY, verticalAmount)) return true;
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override
     public boolean mouseDragged(Click click, double offsetX, double offsetY) {
-        if (this.isDraggingDropdownScrollbar && this.taskTypeButton != null) {
-            int dropY = this.taskTypeButton.getY() + this.taskTypeButton.getHeight();
-            int maxScroll = Math.max(0, TaskType.values().length - MAX_DROPDOWN_VISIBLE);
-            int visibleOptions = Math.min(TaskType.values().length, MAX_DROPDOWN_VISIBLE);
-            int dropHeight = 20 * visibleOptions;
-            
-            this.updateDropdownScroll(click.y(), dropY, dropHeight, maxScroll);
-            return true;
-        }
+        if (this.isTaskDropdownOpen && dropdownScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) return true;
         return super.mouseDragged(click, offsetX, offsetY);
     }
 
     @Override
     public boolean mouseReleased(Click click) {
-        if (click.button() == 0 && this.isDraggingDropdownScrollbar) {
-            this.isDraggingDropdownScrollbar = false;
-            return true;
-        }
+        if (this.isTaskDropdownOpen && dropdownScrollbar.mouseReleased(click.x(), click.y(), click.button())) return true;
         return super.mouseReleased(click);
     }
 
-    private void updateDropdownScroll(double mouseY, int startY, int scrollHeight, int maxScroll) {
-        int thumbHeight = 15;
-        double adjustedY = mouseY - startY - (thumbHeight / 2.0);
-        double ratio = adjustedY / (scrollHeight - thumbHeight);
-        ratio = Math.clamp(ratio, 0.0, 1.0);
-        this.taskDropdownScroll = (int) Math.round(ratio * maxScroll);
-    }
+
 
     @Override
     public boolean mouseClicked(Click click, boolean doubled) {
@@ -390,18 +365,16 @@ public class EditQuestScreen extends Screen {
             int dropWidth = this.taskTypeButton.getWidth();
             
             int numOptions = TaskType.values().length;
-            int maxScroll = Math.max(0, numOptions - MAX_DROPDOWN_VISIBLE);
             int visibleOptions = Math.min(numOptions, MAX_DROPDOWN_VISIBLE);
             int dropHeight = 20 * visibleOptions;
 
-            if (maxScroll > 0 && click.x() >= dropX + dropWidth && click.x() <= dropX + dropWidth + 6 && click.y() >= dropY && click.y() <= dropY + dropHeight) {
-                this.isDraggingDropdownScrollbar = true;
-                this.updateDropdownScroll(click.y(), dropY, dropHeight, maxScroll);
+            if (dropdownScrollbar.mouseClicked(click.x(), click.y(), click.button())) {
                 return true;
             }
 
             if (click.x() >= dropX && click.x() < dropX + dropWidth && click.y() >= dropY && click.y() < dropY + dropHeight) {
-                int index = this.taskDropdownScroll + (int) ((click.y() - dropY) / 20);
+                int taskDropdownScroll = dropdownScrollbar.getStepOffset();
+                int index = (int) ((taskDropdownScroll + click.y() - dropY) / 20);
                 if (index >= 0 && index < numOptions) {
                     this.currentTaskType = TaskType.values()[index];
                     this.taskTypeButton.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + I18n.translate("task.pacpack-quests." + this.currentTaskType.name().toLowerCase())));
@@ -417,6 +390,7 @@ public class EditQuestScreen extends Screen {
             } else if (!this.taskTypeButton.isMouseOver(click.x(), click.y())) {
                 this.isTaskDropdownOpen = false;
             }
+            return true;
         }
         return super.mouseClicked(click, doubled);
     }
@@ -449,9 +423,9 @@ public class EditQuestScreen extends Screen {
             int dropWidth = this.taskTypeButton.getWidth();
             int numOptions = TaskType.values().length;
             
-            int maxScroll = Math.max(0, numOptions - MAX_DROPDOWN_VISIBLE);
             int visibleOptions = Math.min(numOptions, MAX_DROPDOWN_VISIBLE);
             int dropHeight = 20 * visibleOptions;
+            int maxScroll = Math.max(0, (numOptions * 20) - dropHeight);
 
             // overall background
             context.fill(dropX, dropY, dropX + dropWidth, dropY + dropHeight, 0xFF000000);
@@ -463,36 +437,30 @@ public class EditQuestScreen extends Screen {
             context.fill(dropX - 1, dropY, dropX, dropY + dropHeight, 0xFFAAAAAA);
             context.fill(dropX + totalWidth, dropY, dropX + totalWidth + 1, dropY + dropHeight, 0xFFAAAAAA);
 
-            for (int i = 0; i < visibleOptions; i++) {
-                int dataIndex = this.taskDropdownScroll + i;
-                if (dataIndex >= numOptions) break;
+            context.enableScissor(dropX, dropY, dropX + dropWidth, dropY + dropHeight);
+            context.getMatrices().translate(0f, (float) -dropdownScrollbar.getScrollAmount());
 
+            for (int i = 0; i < numOptions; i++) {
                 int optY = dropY + (i * 20);
-                boolean hovered = mouseX >= dropX && mouseX < dropX + dropWidth && mouseY >= optY && mouseY < optY + 20;
+                boolean hovered = mouseX >= dropX && mouseX < dropX + dropWidth && mouseY >= dropY && mouseY < dropY + dropHeight && 
+                                  (mouseY + dropdownScrollbar.getScrollAmount()) >= optY && (mouseY + dropdownScrollbar.getScrollAmount()) < optY + 20;
                 
                 if (hovered) {
                     context.fill(dropX, optY, dropX + dropWidth, optY + 20, 0xFF666666);
                 }
-                context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(I18n.translate("task.pacpack-quests." + TaskType.values()[dataIndex].name().toLowerCase())), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
+                context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(I18n.translate("task.pacpack-quests." + TaskType.values()[i].name().toLowerCase())), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
             }
+
+            context.getMatrices().translate(0f, (float) dropdownScrollbar.getScrollAmount());
+            context.disableScissor();
 
             // Draw scrollbar if needed
             if (maxScroll > 0) {
-                int scrollX = dropX + dropWidth;
-                int thumbHeight = 15;
-                
-                // Track background
-                context.fill(scrollX, dropY, scrollX + 6, dropY + dropHeight, 0xFF222222);
-                
-                float scrollRatio = (float) this.taskDropdownScroll / maxScroll;
-                int thumbY = dropY + (int) (scrollRatio * (dropHeight - thumbHeight));
-                
-                boolean isHoveringThumb = mouseX >= scrollX && mouseX <= scrollX + 6 && mouseY >= thumbY && mouseY <= thumbY + thumbHeight;
-                int thumbColor = (this.isDraggingDropdownScrollbar || isHoveringThumb) ? 0xFFFFFFFF : 0xFFAAAAAA;
-                
-                // Thumb
-                context.fill(scrollX, thumbY, scrollX + 6, thumbY + thumbHeight, thumbColor);
+                dropdownScrollbar.setBounds(dropX + dropWidth, dropY, 6, dropHeight);
+                dropdownScrollbar.setMaxScroll(maxScroll, dropHeight);
+                dropdownScrollbar.render(context, mouseX, mouseY);
             }
+        
         }
     }
 }
