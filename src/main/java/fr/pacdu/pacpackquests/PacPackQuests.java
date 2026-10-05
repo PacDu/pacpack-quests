@@ -14,6 +14,11 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.minecraft.block.entity.LootableContainerBlockEntity;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -158,6 +163,49 @@ public class PacPackQuests implements ModInitializer {
 			}
 		});
 
+        // Check opened chests
+        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            if (!world.isClient() && hand == Hand.MAIN_HAND) {
+                net.minecraft.block.entity.BlockEntity be = world.getBlockEntity(hitResult.getBlockPos());
+                if (be instanceof LootableContainerBlockEntity lootable) {
+                    var lootKey = lootable.getLootTable();
+                    if (lootKey != null) {
+                        net.minecraft.util.Identifier lootTableId = lootKey.getValue();
+                        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+                            if (quest.type() == TaskType.OPEN_LOOT_CHEST) {
+                                String target = quest.target();
+                                if (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString())) {
+                                    QuestProgressHandler.incrementProgress((net.minecraft.server.network.ServerPlayerEntity) player, quest, 1);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return ActionResult.PASS;
+        });
+
+        // Check opened minecarts
+        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+            if (!world.isClient() && hand == Hand.MAIN_HAND && hitResult != null) {
+                if (entity instanceof net.minecraft.entity.vehicle.VehicleInventory vehicle) {
+                    var lootKey = vehicle.getLootTable();
+                    if (lootKey != null) {
+                        Identifier lootTableId = lootKey.getValue();
+                        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+                            if (quest.type() == TaskType.OPEN_LOOT_CHEST) {
+                                String target = quest.target();
+                                if (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString())) {
+                                    QuestProgressHandler.incrementProgress((net.minecraft.server.network.ServerPlayerEntity) player, quest, 1);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return ActionResult.PASS;
+        });
+
         //Check biome, structure and dimension
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             // Run every 5 ticks (4 times per second).
@@ -276,6 +324,10 @@ public class PacPackQuests implements ModInitializer {
                 }
             }
         });
+
+
+
+        // ------- NETWORK ------- \\
 
 		// Claim Event: Listen to reward claim requests
 		ServerPlayNetworking.registerGlobalReceiver(ClaimQuestPayload.ID, (payload, context) -> context.server().execute(() -> {

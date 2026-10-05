@@ -36,7 +36,7 @@ public class SelectionScreen extends Screen {
     private final List<String> filteredEntries = new ArrayList<>();
 
     private fr.pacdu.pacpackquests.client.gui.ScrollbarWidget gridScrollbar = new fr.pacdu.pacpackquests.client.gui.ScrollbarWidget(0, 0, 6, 0, 1.0, false);
-    
+
     private int columns;
     private int rows;
     private int maxVisible;
@@ -144,7 +144,21 @@ public class SelectionScreen extends Screen {
                     handler.getWorldKeys().forEach(key -> allEntries.add(key.getValue().toString()));
                 }
             }
+            case LOOT_TABLE -> {
+                allEntries.add("#pacpackquests:loot_chest");
+                var server = MinecraftClient.getInstance().getServer();
+                if (server != null) {
+                    var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(net.minecraft.registry.RegistryKeys.LOOT_TABLE);
+                    opt.ifPresent(lootTableImpl -> lootTableImpl.streamKeys().forEach(key -> {
+                        net.minecraft.util.Identifier id = key.getValue();
+                        if (id.getPath().startsWith("chests/")) {
+                            allEntries.add(id.toString());
+                        }
+                    }));
+                }
+            }
         }
+
 
         this.allEntries.sort(this::compareEntries);
     }
@@ -333,6 +347,8 @@ public class SelectionScreen extends Screen {
                 yield -1;
             }
             case DIMENSION -> -1; // Dimensions do not have standard numeric IDs; they will be listed in alphabetical order
+            case LOOT_TABLE -> -1;
         };
     }
 }
+ 

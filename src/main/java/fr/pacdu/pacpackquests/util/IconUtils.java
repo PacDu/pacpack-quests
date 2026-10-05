@@ -121,7 +121,7 @@ public class IconUtils {
         return switch (type) {
             case DIMENSION -> Items.OBSIDIAN;
             case BIOME -> Items.GRASS_BLOCK;
-            case STRUCTURE -> Items.CHEST;
+            case STRUCTURE, LOOT_TABLE -> Items.CHEST;
             default -> Items.BARRIER;
         };
     }

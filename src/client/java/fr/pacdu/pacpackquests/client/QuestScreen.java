@@ -160,30 +160,34 @@ public class QuestScreen extends Screen {
 		context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, startY - 18, -1);
 
 		// --- DRAW CATEGORIES ---
+		int categMarginTop = 20;
+		int categMarginBottom = 10;
+		int categMarginY = categMarginTop + categMarginBottom;
+
 		int tabX = startX - tabWidth;
-		int currentTabY = startY + 20;
+		int currentTabY = startY + categMarginTop;
 
 		int totalTabs = CLIENT_CATEGORIES.size() + (isEditMode ? 1 : 0);
-		double totalContentHeight = totalTabs * (tabHeight + 5);
-		double maxScroll = Math.max(0, totalContentHeight - (windowHeight - 20));
+		double totalContentHeight = totalTabs * (tabHeight + 5) - 5;
+		double maxScroll = Math.max(0, totalContentHeight - (windowHeight - categMarginY));
 		
 		int scrollX = isEditMode ? tabX - 35 : tabX - 10;
-		categoryScrollbar.setBounds(scrollX, startY + 20, 6, windowHeight - 20);
-		categoryScrollbar.setMaxScroll(maxScroll, this.height - 40);
+		categoryScrollbar.setBounds(scrollX, startY + categMarginTop, 6, windowHeight - categMarginY);
+		categoryScrollbar.setMaxScroll(maxScroll, this.height - categMarginY);
 
 		double scrollAmount = categoryScrollbar.getScrollAmount();
 		int dropIndex = -1;
 		if (draggedCategory != null) {
-			dropIndex = Math.clamp((int) Math.round((mouseY + scrollAmount - (startY + 20.0)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
+			dropIndex = Math.clamp((int) Math.round((mouseY + scrollAmount - (startY + categMarginTop)) / (tabHeight + 5.0)), 0, CLIENT_CATEGORIES.size());
 		}
 
-		context.enableScissor(tabX - 40, startY + 20, startX, startY + windowHeight);
+		context.enableScissor(tabX - 40, startY + categMarginTop, startX, startY + windowHeight - categMarginBottom);
 		
 		context.getMatrices().translate(0f, (float)-scrollAmount);
 
 		int catIndex = 0;
 		for (String category : CLIENT_CATEGORIES) {
-			if (currentTabY + tabHeight < startY + 20 + scrollAmount || currentTabY > startY + windowHeight + scrollAmount) {
+			if (currentTabY + tabHeight < startY + categMarginTop + scrollAmount || currentTabY > startY + windowHeight + scrollAmount - categMarginBottom) {
 				currentTabY += tabHeight + 5;
 				catIndex++;
 				continue;
@@ -821,8 +825,9 @@ public class QuestScreen extends Screen {
 			else if (Registries.ENTITY_TYPE.containsId(id)) {
 				return Registries.ENTITY_TYPE.get(id).getName().getString();
 			}
-			// If it's a Biome, Dimension or Structure
+			// If it's a Biome, Dimension, Structure or Loot Table
 			else {
+                if (target.equals("#pacpackquests:loot_chest")) return I18n.translate("pacpackquests.any_loot_chest");
 				String path = id.getPath();
 				return path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
 			}

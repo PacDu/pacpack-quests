@@ -14,6 +14,8 @@
   "gui.pacpack-quests.explore_structure": "Explorer",
   "gui.pacpack-quests.explore_dimension": "Explorer",
   "gui.pacpack-quests.obtain_item": "Obtenir",
+  "gui.pacpack-quests.open_loot_chest": "Ouvrir",
+  "gui.pacpack-quests.open_loot_chest": "Ouvrir",
   "gui.pacpack-quests.status": "Statut",
   "gui.pacpack-quests.ready_to_claim": "Prêt à être récupéré !",
   "gui.pacpack-quests.completed": "Complété",
@@ -59,6 +61,8 @@
   "task.pacpack-quests.explore_structure": "Explorer une structure",
   "task.pacpack-quests.explore_dimension": "Explorer une dimension",
   "task.pacpack-quests.obtain_item": "Obtenir un objet",
+  "task.pacpack-quests.open_loot_chest": "Ouvrir un coffre de loot",
+  "pacpackquests.any_loot_chest": "N'importe quel coffre de loot",
 
   "error.pacpack-quests.invalid_id": "ID invalide ! Utilisez des minuscules, chiffres et underscores.",
   "error.pacpack-quests.id_already_exists": "Cet ID de quête existe déjà !",

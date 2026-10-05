@@ -14,6 +14,7 @@
   "gui.pacpack-quests.explore_structure": "Explore",
   "gui.pacpack-quests.explore_dimension": "Explore",
   "gui.pacpack-quests.obtain_item": "Obtain",
+  "gui.pacpack-quests.open_loot_chest": "Open",
   "gui.pacpack-quests.status": "Status",
   "gui.pacpack-quests.ready_to_claim": "Ready to Claim!",
   "gui.pacpack-quests.completed": "Completed",
@@ -59,6 +60,8 @@
   "task.pacpack-quests.explore_structure": "Explore Structure",
   "task.pacpack-quests.explore_dimension": "Explore Dimension",
   "task.pacpack-quests.obtain_item": "Obtain Item",
+  "task.pacpack-quests.open_loot_chest": "Open a Loot Chest",
+  "pacpackquests.any_loot_chest": "Any Loot Chest",
 
   "error.pacpack-quests.invalid_id": "Invalid ID! Use only lowercase letters, numbers, and underscores.",
   "error.pacpack-quests.id_already_exists": "This Quest ID already exists!",

@@ -9,5 +9,6 @@ public enum RegistryType {
     MOB,
     BIOME,
     STRUCTURE,
-    DIMENSION
+    DIMENSION,
+    LOOT_TABLE
 }

@@ -160,6 +160,7 @@ public class EditQuestScreen extends Screen {
                 case EXPLORE_BIOME -> RegistryType.BIOME;
                 case EXPLORE_STRUCTURE -> RegistryType.STRUCTURE;
                 case EXPLORE_DIMENSION -> RegistryType.DIMENSION;
+                case OPEN_LOOT_CHEST -> RegistryType.LOOT_TABLE;
             };
             this.client.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedTarget = result;
@@ -232,6 +233,7 @@ public class EditQuestScreen extends Screen {
                 case EXPLORE_BIOME -> MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).getOptional(TagKey.of(RegistryKeys.BIOME, id)).isPresent();
                 case EXPLORE_STRUCTURE -> true;
                 case EXPLORE_DIMENSION -> false;
+                case OPEN_LOOT_CHEST -> target.equals("#pacpackquests:loot_chest");
             };
         }
         Identifier id = Identifier.tryParse(target);
@@ -245,6 +247,10 @@ public class EditQuestScreen extends Screen {
             case EXPLORE_DIMENSION -> {
                 var handler = MinecraftClient.getInstance().getNetworkHandler();
                 yield handler != null && handler.getWorldKeys().stream().anyMatch(key -> key.getValue().equals(id));
+            }
+            case OPEN_LOOT_CHEST -> {
+                var server = MinecraftClient.getInstance().getServer();
+                if (server == null) yield true; var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE); if (opt.isPresent()) { var key = net.minecraft.registry.RegistryKey.of(RegistryKeys.LOOT_TABLE, id); yield opt.get().getOptional(key).isPresent(); } yield false;
             }
         };
     }
@@ -413,7 +419,7 @@ public class EditQuestScreen extends Screen {
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.parents"), this.parentsField.getX(), this.parentsField.getY() - 10, 0xFFFFFFFF, true);
 
         if (this.errorMessage != null) {
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(this.errorMessage).formatted(Formatting.RED, Formatting.BOLD), this.width / 2, this.height - 20, 0xFFFFFFFF);
+            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(this.errorMessage).formatted(Formatting.RED, Formatting.BOLD), this.width / 2, this.height - 52, 0xFFFFFFFF);
         }
 
         // Draw TaskType dropdown menu on top

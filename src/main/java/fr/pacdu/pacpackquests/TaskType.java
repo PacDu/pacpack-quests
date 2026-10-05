@@ -14,7 +14,8 @@ public enum TaskType {
     EXPLORE_BIOME,
     EXPLORE_STRUCTURE,
     EXPLORE_DIMENSION,
-    OBTAIN_ITEM;
+    OBTAIN_ITEM,
+    OPEN_LOOT_CHEST;
 
     // Caching values at startup
     private static final Map<String, TaskType> TASK_TYPE_MAP = new HashMap<>();
