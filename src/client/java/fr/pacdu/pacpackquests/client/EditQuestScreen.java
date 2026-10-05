@@ -120,7 +120,7 @@ public class EditQuestScreen extends Screen {
             this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
                 this.selectedIcon = result;
                 this.iconButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
-            }));
+            }, false));
         }).dimensions(col2, y, fieldWidth, 20).build();
         this.addDrawableChild(this.iconButton);
 

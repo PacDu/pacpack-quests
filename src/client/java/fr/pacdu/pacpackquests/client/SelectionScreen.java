@@ -1,6 +1,8 @@
 package fr.pacdu.pacpackquests.client;
 
+import fr.pacdu.pacpackquests.util.IconUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
+import fr.pacdu.pacpackquests.util.TagUtils;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
@@ -25,8 +27,6 @@ import static fr.pacdu.pacpackquests.util.TranslationUtils.getTranslatedName;
 
 public class SelectionScreen extends Screen {
 
-    public enum SelectionContext { ITEM, BLOCK, MOB, BIOME, STRUCTURE, DIMENSION }
-
     private final Screen parent;
     private final RegistryType contextType;
     private final Consumer<String> onSelected;
@@ -37,9 +37,10 @@ public class SelectionScreen extends Screen {
 
     private fr.pacdu.pacpackquests.client.gui.ScrollbarWidget gridScrollbar = new fr.pacdu.pacpackquests.client.gui.ScrollbarWidget(0, 0, 6, 0, 1.0, false);
     
-    private final int columns = 9;
-    private final int rows = 5;
-    private final int maxVisible = columns * rows; // 45 items per page
+    private int columns;
+    private int rows;
+    private int maxVisible;
+    private boolean withTags = true;
 
     public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected) {
         super(Text.translatable("gui.pacpack-quests.select_element"));
@@ -48,9 +49,18 @@ public class SelectionScreen extends Screen {
         this.onSelected = onSelected;
     }
 
+    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, boolean withTags) {
+        this(parent, contextType, onSelected);
+        this.withTags = withTags;
+    }
+
     @Override
     protected void init() {
         super.init();
+
+        this.columns = this.width / 18 - 5;
+        this.rows = this.height / 18 - 5;
+        this.maxVisible = this.columns * this.rows;
 
         // 1. Search Box
         int searchWidth = 160;
@@ -76,21 +86,47 @@ public class SelectionScreen extends Screen {
         switch (contextType) {
             case ITEM -> {
                 Registries.ITEM.getIds().forEach(id -> allEntries.add(id.toString()));
-                Registries.ITEM.streamTags().forEach(tag -> allEntries.add("#" + tag.getTagKey().get().id().toString()));
+                if (this.withTags) Registries.ITEM.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> allEntries.add("#" + key.id().toString())));
             }
             case BLOCK -> {
                 Registries.BLOCK.getIds().forEach(id -> allEntries.add(id.toString()));
-                Registries.BLOCK.streamTags().forEach(tag -> allEntries.add("#" + tag.getTagKey().get().id().toString()));
+                Registries.BLOCK.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> allEntries.add("#" + key.id().toString())));
             }
             case MOB -> {
-                Registries.ENTITY_TYPE.getIds().forEach(id -> allEntries.add(id.toString()));
-                Registries.ENTITY_TYPE.streamTags().forEach(tag -> allEntries.add("#" + tag.getTagKey().get().id().toString()));
+                java.util.Set<Identifier> validMobs = new java.util.HashSet<>();
+
+                // 1. Filter the raw entity IDs to keep only real mobs
+                Registries.ENTITY_TYPE.getIds().forEach(id -> {
+                    net.minecraft.entity.EntityType<?> type = Registries.ENTITY_TYPE.get(id);
+                    net.minecraft.entity.SpawnGroup group = type.getSpawnGroup();
+
+                    // Check if a spawn egg exists for this entity (covers MISC mobs like Wither, Villagers, Golems)
+                    Identifier eggId = Identifier.of(id.getNamespace(), id.getPath() + "_spawn_egg");
+                    boolean hasSpawnEgg = Registries.ITEM.containsId(eggId);
+
+                    // A valid mob is either in a natural spawn group, has a spawn egg, or is the player explicitly
+                    if (group != net.minecraft.entity.SpawnGroup.MISC || hasSpawnEgg || id.getPath().equals("player")) {
+                        validMobs.add(id);
+                        allEntries.add(id.toString());
+                    }
+                });
+
+                // 2. Add a Tag (group) only if at least ONE of its entities is a valid mob
+                Registries.ENTITY_TYPE.streamTags().forEach(tagList -> {
+                    boolean hasValidMob = tagList.stream().anyMatch(entry ->
+                            validMobs.contains(Registries.ENTITY_TYPE.getId(entry.value()))
+                    );
+
+                    if (hasValidMob) {
+                        tagList.getTagKey().ifPresent(key -> allEntries.add("#" + key.id().toString()));
+                    }
+                });
             }
             case BIOME -> {
                 if (world != null) {
                     var registry = world.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
                     registry.getIds().forEach(id -> allEntries.add(id.toString()));
-                    registry.streamTags().forEach(tag -> allEntries.add("#" + tag.getTagKey().get().id().toString()));
+                    registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> allEntries.add("#" + key.id().toString())));
                 }
             }
             case STRUCTURE -> {
@@ -99,7 +135,7 @@ public class SelectionScreen extends Screen {
                 if (server != null) {
                     var registry = server.getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
                     registry.getIds().forEach(id -> allEntries.add(id.toString()));
-                    registry.streamTags().forEach(tag -> allEntries.add("#" + tag.getTagKey().get().id().toString()));
+                    registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> allEntries.add("#" + key.id().toString())));
                 }
             }
             case DIMENSION -> {
@@ -150,7 +186,7 @@ public class SelectionScreen extends Screen {
             int cellY = startY + (row * 18);
 
             // Draw Item Icon
-            ItemStack icon = getRepresentativeItem(entryId);
+            ItemStack icon = IconUtils.getRepresentativeItem(entryId, this.contextType).getDefaultStack();
             context.drawItem(icon, cellX + 1, cellY + 1);
 
             // If it's a tag, draw a small yellow '#' overlay
@@ -244,36 +280,6 @@ public class SelectionScreen extends Screen {
             return true;
         }
         return super.keyPressed(input);
-    }
-
-    // --- Helper Methods to construct visual representations ---
-
-    private ItemStack getRepresentativeItem(String entryId) {
-        boolean isTag = entryId.startsWith("#");
-        String rawId = isTag ? entryId.substring(1) : entryId;
-        Identifier id = Identifier.tryParse(rawId);
-
-        if (id == null) return Items.BARRIER.getDefaultStack();
-
-        return switch (this.contextType) {
-            case ITEM -> isTag ? Items.NAME_TAG.getDefaultStack() : Registries.ITEM.get(id).getDefaultStack();
-            case BLOCK -> {
-                if (isTag) yield Items.NAME_TAG.getDefaultStack();
-                var blockItem = Registries.BLOCK.get(id).asItem();
-                // If the block has no associated item (e.g. water, fire), display a barrier
-                yield blockItem != Items.AIR ? blockItem.getDefaultStack() : Items.BARRIER.getDefaultStack();
-            }
-            case MOB -> {
-                if (isTag) yield Items.ZOMBIE_HEAD.getDefaultStack();
-                // Try to find the spawn egg for this mob
-                Identifier eggId = Identifier.of(id.getNamespace(), id.getPath() + "_spawn_egg");
-                if (Registries.ITEM.containsId(eggId)) yield Registries.ITEM.get(eggId).getDefaultStack();
-                yield Items.SPAWNER.getDefaultStack();
-            }
-            case BIOME -> Items.GRASS_BLOCK.getDefaultStack();
-            case STRUCTURE -> Items.CHEST.getDefaultStack();
-            case DIMENSION -> Items.OBSIDIAN.getDefaultStack();
-        };
     }
 
     // Custom Sort Function
