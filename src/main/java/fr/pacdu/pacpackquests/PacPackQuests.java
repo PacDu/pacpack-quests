@@ -17,6 +17,9 @@ import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.block.entity.LootableContainerBlockEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.loot.LootTable;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -58,6 +61,7 @@ public class PacPackQuests implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+
 		LOGGER.info("Initializing PacPack Quests...");
 		ModConfig.load();
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> QuestManager.loadQuests());
@@ -169,17 +173,7 @@ public class PacPackQuests implements ModInitializer {
                 net.minecraft.block.entity.BlockEntity be = world.getBlockEntity(hitResult.getBlockPos());
                 if (be instanceof LootableContainerBlockEntity lootable) {
                     var lootKey = lootable.getLootTable();
-                    if (lootKey != null) {
-                        net.minecraft.util.Identifier lootTableId = lootKey.getValue();
-                        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                            if (quest.type() == TaskType.OPEN_LOOT_CHEST) {
-                                String target = quest.target();
-                                if (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString())) {
-                                    QuestProgressHandler.incrementProgress((net.minecraft.server.network.ServerPlayerEntity) player, quest, 1);
-                                }
-                            }
-                        }
-                    }
+                    computeOpenedChest(lootKey, player, be, false);
                 }
             }
             return ActionResult.PASS;
@@ -190,17 +184,7 @@ public class PacPackQuests implements ModInitializer {
             if (!world.isClient() && hand == Hand.MAIN_HAND && hitResult != null) {
                 if (entity instanceof net.minecraft.entity.vehicle.VehicleInventory vehicle) {
                     var lootKey = vehicle.getLootTable();
-                    if (lootKey != null) {
-                        Identifier lootTableId = lootKey.getValue();
-                        for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                            if (quest.type() == TaskType.OPEN_LOOT_CHEST) {
-                                String target = quest.target();
-                                if (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString())) {
-                                    QuestProgressHandler.incrementProgress((net.minecraft.server.network.ServerPlayerEntity) player, quest, 1);
-                                }
-                            }
-                        }
-                    }
+                    computeOpenedChest(lootKey, player, entity, true);
                 }
             }
             return ActionResult.PASS;
@@ -584,4 +568,35 @@ public class PacPackQuests implements ModInitializer {
             }
         }));
 	}
+
+    private static void computeOpenedChest(RegistryKey<LootTable> lootKey, PlayerEntity player, Object entity, boolean isEntity) {
+        if (lootKey != null) {
+            Identifier lootTableId = lootKey.getValue();
+            for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+                if (quest.type() == TaskType.OPEN_LOOT_CHEST) {
+                    String target = quest.target();
+                    if (checkLootrStatus((ServerPlayerEntity) player, entity, isEntity) && (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString()))) {
+                        QuestProgressHandler.incrementProgress((ServerPlayerEntity) player, quest, 1);
+                    }
+                }
+            }
+        }
+    }
+
+        private static boolean checkLootrStatus(net.minecraft.server.network.ServerPlayerEntity player, Object target, boolean isEntity) {
+        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("lootr")) {
+            return true;
+        }
+        try {
+            Class<?> infoClass = Class.forName("noobanidus.mods.lootr.common.api.data.ILootrInfoProvider");
+            if (infoClass.isInstance(target)) {
+                java.lang.reflect.Method hasOpened = infoClass.getMethod("hasOpened", java.util.UUID.class);
+                boolean opened = (boolean) hasOpened.invoke(target, player.getUuid());
+                return !opened;
+            }
+        } catch (Exception e) {
+            LOGGER.warn("You are using an outdated or incompatible version of Lootr! Loot chest quests may be exploitable.");
+        }
+        return true;
+    }
 }
