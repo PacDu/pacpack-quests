@@ -3,6 +3,7 @@ package fr.pacdu.pacpackquests.client;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.SaveQuestPayload;
 import fr.pacdu.pacpackquests.util.RegistryType;
@@ -39,7 +40,7 @@ public class EditQuestScreen extends Screen {
     private ButtonWidget targetButton, iconButton, rewardButton, taskTypeButton;
 
     private boolean isTaskDropdownOpen = false;
-    private fr.pacdu.pacpackquests.client.gui.ScrollbarWidget dropdownScrollbar = new fr.pacdu.pacpackquests.client.gui.ScrollbarWidget(0, 0, 6, 0, 1, true);
+    private final ScrollbarWidget dropdownScrollbar = new ScrollbarWidget(0, 0, 6, 0, 1, true);
     private static final int MAX_DROPDOWN_VISIBLE = 4;
 
     // State variables holding the currently selected Strings
@@ -387,9 +388,21 @@ public class EditQuestScreen extends Screen {
                     this.isTaskDropdownOpen = false;
                     this.reqAmountField.setEditable(this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME);
 
-                    if (currentTaskType == TaskType.EXPLORE_DIMENSION || currentTaskType == TaskType.EXPLORE_BIOME) {
+                    if (this.currentTaskType == TaskType.EXPLORE_DIMENSION || this.currentTaskType == TaskType.EXPLORE_BIOME) {
                         this.reqAmountField.setText("1");
                     }
+
+                    this.selectedTarget = switch (this.currentTaskType) {
+                        case MINE_BLOCK -> "minecraft:stone";
+                        case KILL_MOB -> "minecraft:zombie";
+                        case CRAFT_ITEM, OBTAIN_ITEM -> "minecraft:iron_pickaxe";
+                        case EXPLORE_BIOME -> "minecraft:desert";
+                        case EXPLORE_STRUCTURE -> "minecraft:ruined_portal";
+                        case EXPLORE_DIMENSION -> "minecraft:the_nether";
+                        case OPEN_LOOT_CHEST -> "#pacpackquests:loot_chests";
+                    };
+
+                    this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(selectedTarget, RegistryType.ITEM))));
 
                     return true;
                 }

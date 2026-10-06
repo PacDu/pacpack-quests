@@ -3,6 +3,7 @@ package fr.pacdu.pacpackquests.client;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.*;
+import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -172,16 +173,16 @@ public class PacPackQuestsClient implements ClientModInitializer {
         }));
 
         ClientPlayNetworking.registerGlobalReceiver(SyncRegistryPayload.ID, (payload, context) -> context.client().execute(() -> {
-            if (payload.type() == fr.pacdu.pacpackquests.util.RegistryType.STRUCTURE) {
+            if (payload.type() == RegistryType.STRUCTURE) {
                 SERVER_STRUCTURES.clear();
                 SERVER_STRUCTURES.addAll(payload.entries());
-                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == fr.pacdu.pacpackquests.util.RegistryType.STRUCTURE) {
+                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.STRUCTURE) {
                     screen.refreshEntries(SERVER_STRUCTURES);
                 }
-            } else if (payload.type() == fr.pacdu.pacpackquests.util.RegistryType.LOOT_TABLE) {
+            } else if (payload.type() == RegistryType.LOOT_TABLE) {
                 SERVER_LOOT_TABLES.clear();
                 SERVER_LOOT_TABLES.addAll(payload.entries());
-                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == fr.pacdu.pacpackquests.util.RegistryType.LOOT_TABLE) {
+                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.LOOT_TABLE) {
                     screen.refreshEntries(SERVER_LOOT_TABLES);
                 }
             }

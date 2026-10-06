@@ -41,7 +41,7 @@
 
   "form.pacpack-quests.quest_id": "ID de la Quête",
   "form.pacpack-quests.quest_id_placeholder": "ex: ma_premiere_quete",
-  "form.pacpack-quests.icon_item_id": "Icône (ID d'Item)",
+  "form.pacpack-quests.icon_item_id": "Icône",
   "form.pacpack-quests.title": "Titre",
   "form.pacpack-quests.title_placeholder": "ex: Bien commencer",
   "form.pacpack-quests.parents": "IDs des Parents (Séparés par une virgule)",
