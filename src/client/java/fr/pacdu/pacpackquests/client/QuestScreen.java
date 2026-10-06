@@ -786,6 +786,7 @@ public class QuestScreen extends Screen {
 				categoryEditTarget = null;
 				return true;
 			}
+			return super.keyPressed(input);
 		}
 
 		if (openQuestMenuKey.matchesKey(input)) {

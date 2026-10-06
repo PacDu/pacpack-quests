@@ -558,7 +558,18 @@ public class PacPackQuests implements ModInitializer {
                     dir.renameTo(newDir);
                 }
 
-                QuestManager.LOADED_QUESTS.values().removeIf(quest -> quest.category().equals(categoryToEdit));
+                java.util.List<QuestDefinition> questsToUpdate = new java.util.ArrayList<>();
+                for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
+                    if (quest.category().equals(categoryToEdit)) {
+                        questsToUpdate.add(quest);
+                    }
+                }
+                for (QuestDefinition quest : questsToUpdate) {
+                    QuestDefinition updatedQuest = new QuestDefinition(quest.id(), quest.title(), newCategory,
+                            quest.type(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
+                            quest.rewardType(), quest.rewardAmount(), quest.parents(), quest.displayX(), quest.displayY());
+                    QuestManager.LOADED_QUESTS.put(quest.id(), updatedQuest);
+                }
 
                 EditCategoryPayload syncPayload = new EditCategoryPayload(categoryToEdit, newCategory);
                 context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPayload));

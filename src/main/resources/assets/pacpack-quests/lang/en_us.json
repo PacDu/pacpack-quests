@@ -44,7 +44,7 @@
   "form.pacpack-quests.icon_item_id": "Icon (Item ID)",
   "form.pacpack-quests.title": "Title",
   "form.pacpack-quests.title_placeholder": "e.g., Getting Started",
-  "form.pacpack-quests.parents": "Parents (Comma separated)",
+  "form.pacpack-quests.parents": "Parents IDs (Comma separated)",
   "form.pacpack-quests.parents_placeholder": "e.g., quest_1, quest_2",
   "form.pacpack-quests.task_type": "Task",
   "form.pacpack-quests.reward_type": "Reward",
