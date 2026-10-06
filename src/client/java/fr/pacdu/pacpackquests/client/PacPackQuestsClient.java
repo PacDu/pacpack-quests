@@ -30,6 +30,8 @@ public class PacPackQuestsClient implements ClientModInitializer {
 	public static final Map<String, Boolean> CLIENT_FINISHED = new HashMap<>();
 	public static final Map<String, Boolean> CLIENT_CLAIMED = new HashMap<>();
 	public static final List<String> CLIENT_CATEGORIES = new ArrayList<>();
+	public static final List<String> SERVER_STRUCTURES = new ArrayList<>();
+	public static final List<String> SERVER_LOOT_TABLES = new ArrayList<>();
 
 	public static final KeyBinding.Category QUEST_CATEGORY_KEY = KeyBinding.Category.create(Identifier.of("pacpack-quests", "keys"));
 
@@ -41,6 +43,8 @@ public class PacPackQuestsClient implements ClientModInitializer {
             CLIENT_FINISHED.clear();
             CLIENT_CLAIMED.clear();
             CLIENT_CATEGORIES.clear();
+            SERVER_STRUCTURES.clear();
+            SERVER_LOOT_TABLES.clear();
         });
 
 		openQuestMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -144,6 +148,8 @@ public class PacPackQuestsClient implements ClientModInitializer {
 
         ClientPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
             CLIENT_CATEGORIES.clear();
+            SERVER_STRUCTURES.clear();
+            SERVER_LOOT_TABLES.clear();
             CLIENT_CATEGORIES.addAll(payload.categories());
             if (context.client().currentScreen instanceof QuestScreen questScreen) {
                 questScreen.refreshUI();
@@ -162,6 +168,22 @@ public class PacPackQuestsClient implements ClientModInitializer {
 
             if (context.client().currentScreen instanceof QuestScreen questScreen) {
                 questScreen.renameCategory(payload.categoryOld(), payload.categoryNew());
+            }
+        }));
+
+        ClientPlayNetworking.registerGlobalReceiver(SyncRegistryPayload.ID, (payload, context) -> context.client().execute(() -> {
+            if (payload.type() == fr.pacdu.pacpackquests.util.RegistryType.STRUCTURE) {
+                SERVER_STRUCTURES.clear();
+                SERVER_STRUCTURES.addAll(payload.entries());
+                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == fr.pacdu.pacpackquests.util.RegistryType.STRUCTURE) {
+                    screen.refreshEntries(SERVER_STRUCTURES);
+                }
+            } else if (payload.type() == fr.pacdu.pacpackquests.util.RegistryType.LOOT_TABLE) {
+                SERVER_LOOT_TABLES.clear();
+                SERVER_LOOT_TABLES.addAll(payload.entries());
+                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == fr.pacdu.pacpackquests.util.RegistryType.LOOT_TABLE) {
+                    screen.refreshEntries(SERVER_LOOT_TABLES);
+                }
             }
         }));
 

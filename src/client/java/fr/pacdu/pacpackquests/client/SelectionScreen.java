@@ -1,8 +1,10 @@
 package fr.pacdu.pacpackquests.client;
 
+import fr.pacdu.pacpackquests.network.RequestRegistryPayload;
 import fr.pacdu.pacpackquests.util.IconUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import fr.pacdu.pacpackquests.util.TagUtils;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
@@ -136,6 +138,9 @@ public class SelectionScreen extends Screen {
                     var registry = server.getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
                     registry.getIds().forEach(id -> allEntries.add(id.toString()));
                     registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> allEntries.add("#" + key.id().toString())));
+                } else {
+                    allEntries.addAll(PacPackQuestsClient.SERVER_STRUCTURES);
+                    ClientPlayNetworking.send(new RequestRegistryPayload(RegistryType.STRUCTURE));
                 }
             }
             case DIMENSION -> {
@@ -148,19 +153,34 @@ public class SelectionScreen extends Screen {
                 allEntries.add("#pacpackquests:loot_chest");
                 var server = MinecraftClient.getInstance().getServer();
                 if (server != null) {
-                    var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(net.minecraft.registry.RegistryKeys.LOOT_TABLE);
+                    var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
                     opt.ifPresent(lootTableImpl -> lootTableImpl.streamKeys().forEach(key -> {
-                        net.minecraft.util.Identifier id = key.getValue();
+                        Identifier id = key.getValue();
                         if (id.getPath().startsWith("chests/")) {
                             allEntries.add(id.toString());
                         }
                     }));
+                } else {
+                    allEntries.addAll(PacPackQuestsClient.SERVER_LOOT_TABLES);
+                    ClientPlayNetworking.send(new RequestRegistryPayload(RegistryType.LOOT_TABLE));
                 }
             }
         }
 
 
         this.allEntries.sort(this::compareEntries);
+    }
+
+    public RegistryType getRegistryType() {
+        return this.contextType;
+    }
+
+    public void refreshEntries(java.util.List<String> newEntries) {
+        this.allEntries.clear();
+        if (this.contextType == RegistryType.LOOT_TABLE) this.allEntries.add("#pacpackquests:loot_chest");
+        this.allEntries.addAll(newEntries);
+        this.allEntries.sort(this::compareEntries);
+        this.updateSearch(this.searchBox.getText());
     }
 
     private void updateSearch(String query) {

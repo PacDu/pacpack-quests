@@ -9,6 +9,7 @@ import fr.pacdu.pacpackquests.data.QuestProgressHandler;
 import fr.pacdu.pacpackquests.data.QuestState;
 import fr.pacdu.pacpackquests.network.*;
 
+import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -42,9 +43,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Main entry point for the PacPack Quests mod on the server side.
@@ -74,6 +73,7 @@ public class PacPackQuests implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(EditCategoryPayload.ID, EditCategoryPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(QuestCompletedPayload.ID, QuestCompletedPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(SyncRegistryPayload.ID, SyncRegistryPayload.CODEC);
 
 		PayloadTypeRegistry.playC2S().register(ClaimQuestPayload.ID, ClaimQuestPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(MoveQuestPayload.ID, MoveQuestPayload.CODEC);
@@ -83,6 +83,7 @@ public class PacPackQuests implements ModInitializer {
 		PayloadTypeRegistry.playC2S().register(DeleteCategoryPayload.ID, DeleteCategoryPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(ReorderCategoryPayload.ID, ReorderCategoryPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(EditCategoryPayload.ID, EditCategoryPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(RequestRegistryPayload.ID, RequestRegistryPayload.CODEC);
 
 		// Connection Event: Sync all quests progress when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -544,6 +545,30 @@ public class PacPackQuests implements ModInitializer {
                 if (player != context.player()) {
                     ServerPlayNetworking.send(player, payload);
                 }
+            }
+        }));
+
+        ServerPlayNetworking.registerGlobalReceiver(RequestRegistryPayload.ID, (payload, context) -> context.server().execute(() -> {
+            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
+
+            List<String> entries = new ArrayList<>();
+            if (payload.type() == RegistryType.STRUCTURE) {
+                var registry = context.server().getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
+                registry.getIds().forEach(id -> entries.add(id.toString()));
+                registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> entries.add("#" + key.id().toString())));
+            } else if (payload.type() == RegistryType.LOOT_TABLE) {
+                entries.add("#pacpackquests:loot_chest");
+                var opt = context.server().getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
+                opt.ifPresent(lootTableImpl -> lootTableImpl.streamKeys().forEach(key -> {
+                    Identifier id = key.getValue();
+                    if (id.getPath().startsWith("chests/")) {
+                        entries.add(id.toString());
+                    }
+                }));
+            }
+            
+            if (!entries.isEmpty()) {
+                ServerPlayNetworking.send(context.player(), new SyncRegistryPayload(payload.type(), entries));
             }
         }));
 
