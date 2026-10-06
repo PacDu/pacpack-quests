@@ -184,13 +184,23 @@ public class SelectionScreen extends Screen {
     }
 
     private void updateSearch(String query) {
-        String lowerQuery = query.toLowerCase();
+        String lowerQuery = query.toLowerCase().replaceFirst("@", "");
         filteredEntries.clear();
 
         for (String entry : allEntries) {
-            // Check against the raw ID or the translated name
-            if (entry.toLowerCase().contains(lowerQuery) || getTranslatedName(entry, this.contextType).toLowerCase().contains(lowerQuery)) {
-                filteredEntries.add(entry);
+            int separatorIndex = entry.indexOf(":");
+
+            // If the query start with @, search only in the classname
+            if (!query.isEmpty() && query.charAt(0) == '@') {
+                String classname = entry.substring(0, separatorIndex);
+                if (classname.toLowerCase().replaceFirst("#", "").startsWith(lowerQuery)) {
+                    filteredEntries.add(entry);
+                }
+            } else {
+                String path = entry.substring(separatorIndex + 1);
+                if (path.toLowerCase().contains(lowerQuery) || getTranslatedName(entry, this.contextType).toLowerCase().contains(lowerQuery)) {
+                    filteredEntries.add(entry);
+                }
             }
         }
         // Reset scroll when searching
