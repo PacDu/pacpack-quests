@@ -87,6 +87,10 @@ public class PacPackQuests implements ModInitializer {
 		// Connection Event: Sync all quests progress when a player joins
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			ServerPlayerEntity player = handler.player;
+			
+			// Sync category order from the server config
+			ServerPlayNetworking.send(player, new ReorderCategoryPayload(fr.pacdu.pacpackquests.config.ModConfig.categoryOrder));
+
 			QuestState state = QuestState.getServerState(server);
 			UUID playerId = player.getUuid();
 
