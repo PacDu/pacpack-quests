@@ -60,7 +60,7 @@ public class SelectionScreen extends Screen {
     protected void init() {
         super.init();
 
-        this.columns = this.width / 18 - 5;
+        this.columns = Math.clamp(this.width / 18 - 5, 9, 64);
         this.rows = this.height / 18 - 5;
         this.maxVisible = this.columns * this.rows;
 
@@ -205,6 +205,9 @@ public class SelectionScreen extends Screen {
         }
         // Reset scroll when searching
         gridScrollbar = new fr.pacdu.pacpackquests.client.gui.ScrollbarWidget(0, 0, 6, 0, 1.0, false);
+
+        // Reduce columns number when there are fewer items displayed
+        this.columns = Math.clamp(this.filteredEntries.size(), 9, Math.clamp(this.width / 18 - 5, 9, 64));
     }
 
     @Override
