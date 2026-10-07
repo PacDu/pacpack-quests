@@ -23,6 +23,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 import static fr.pacdu.pacpackquests.util.TranslationUtils.getTranslatedName;
 
@@ -44,8 +45,8 @@ public class EditQuestScreen extends Screen {
     private static final int MAX_DROPDOWN_VISIBLE = 4;
 
     // State variables holding the currently selected Strings
-    private String selectedTarget = "minecraft:stone";
     private String selectedIcon = "minecraft:stone";
+    private String selectedTarget = "minecraft:stone";
     private String selectedReward = "minecraft:diamond";
 
     private TaskType currentTaskType = TaskType.MINE_BLOCK;
@@ -85,8 +86,8 @@ public class EditQuestScreen extends Screen {
             this.currentTaskType = def.type();
 
             // Only update these variables if they are empty (to avoid overwriting SelectionScreen callbacks)
-            if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
             if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = Registries.ITEM.getId(def.icon().getItem()).toString();
+            if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
 
             this.currentRewardType = def.rewardType();
 
@@ -139,16 +140,21 @@ public class EditQuestScreen extends Screen {
 
         // ROW 3: Task Type & Reward Type Toggles
         y += yStep - 10;
-        this.taskTypeButton = ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + I18n.translate("task.pacpack-quests." + currentTaskType.name().toLowerCase())), button -> {
-            this.isTaskDropdownOpen = !this.isTaskDropdownOpen;
-        }).dimensions(col1, y, fieldWidth, 20).build();
+        this.taskTypeButton = ButtonWidget.builder(
+                Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + I18n.translate("task.pacpack-quests." + currentTaskType.name().toLowerCase())),
+                button -> this.isTaskDropdownOpen = !this.isTaskDropdownOpen
+        ).dimensions(col1, y, fieldWidth, 20).build();
         this.addDrawableChild(this.taskTypeButton);
 
-        this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + currentRewardType.name()), button -> {
+        this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + I18n.translate("reward.pacpack-quests." + currentRewardType.name().toLowerCase())), button -> {
             int nextOrdinal = (currentRewardType.ordinal() + 1) % RewardType.values().length;
             currentRewardType = RewardType.values()[nextOrdinal];
-            button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + currentRewardType.name()));
-            this.rewardButton.active = (currentRewardType == RewardType.ITEM); // Disable selection if XP/Levels
+            button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + I18n.translate("reward.pacpack-quests." + currentRewardType.name().toLowerCase())));
+            this.rewardButton.active = currentRewardType == RewardType.ITEM; // Disable selection if XP/Levels
+            switch (currentRewardType) {
+                case ITEM, LEVEL -> this.rewardAmountField.setText("1");
+                case XP -> this.rewardAmountField.setText("100");
+            }
         }).dimensions(col2, y, fieldWidth, 20).build());
 
         // ROW 4: Target Button & Reward Button

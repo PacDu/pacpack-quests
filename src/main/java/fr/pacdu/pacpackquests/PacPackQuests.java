@@ -362,10 +362,7 @@ public class PacPackQuests implements ModInitializer {
         }));
 
 		ServerPlayNetworking.registerGlobalReceiver(MoveQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
-            ServerPlayerEntity player = context.player();
-
-            // Security: Prevent malicious clients from modifying files
-            if (!context.server().getPlayerManager().isOperator(player.getPlayerConfigEntry())) return;
+            if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
             QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
             if (quest == null) return;

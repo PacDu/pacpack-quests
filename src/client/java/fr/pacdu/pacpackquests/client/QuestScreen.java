@@ -8,12 +8,14 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.ConfirmScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.resource.language.I18n;
+import net.minecraft.command.DefaultPermissions;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
@@ -68,7 +70,7 @@ public class QuestScreen extends Screen {
 	protected void init() {
 		super.init();
 
-		windowWidth = this.width - 140;
+		windowWidth = this.width - 2 * this.tabWidth;
 		windowHeight = this.height - 80;
 		startX = (this.width - windowWidth) / 2 + 40;
 		startY = (this.height - windowHeight) / 2 - 10;
@@ -93,13 +95,13 @@ public class QuestScreen extends Screen {
 		this.addDrawableChild(this.claimAllButton);
 
 		// "Edit Mode" Toggle Button (Only visible if player is OP)
-		if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.getPermissions().hasPermission(net.minecraft.command.DefaultPermissions.GAMEMASTERS)) {
+		if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.getPermissions().hasPermission(DefaultPermissions.GAMEMASTERS)) {
 			this.addDrawableChild(
-					ButtonWidget.builder(Text.literal("Edit: " + (isEditMode ? "ON" : "OFF")).formatted(isEditMode ? Formatting.GREEN : Formatting.RED), button -> {
+					ButtonWidget.builder(Text.literal(I18n.translate("gui.pacpack-quests.edit") + ": " + (isEditMode ? "ON" : "OFF")).formatted(isEditMode ? Formatting.GREEN : Formatting.RED), button -> {
 								this.isEditMode = !this.isEditMode;
 								this.clearAndInit(); // Refresh screen to update button text and visuals
 							})
-							.dimensions(startX + windowWidth - 80, startY - 25, 80, 20)
+							.dimensions(startX + windowWidth - buttonWidth, startY - 25, buttonWidth, buttonHeight)
 							.build()
 			);
 		}
@@ -506,7 +508,7 @@ public class QuestScreen extends Screen {
 						int delBtnX = tabX - 14;
 						int delBtnY = currentTabY + 4;
 						if (mouseX >= delBtnX && mouseX <= delBtnX + 10 && adjustedMouseY >= delBtnY && adjustedMouseY <= delBtnY + 10) {
-							this.client.setScreen(new net.minecraft.client.gui.screen.ConfirmScreen(
+							this.client.setScreen(new ConfirmScreen(
 									confirmed -> {
 										if (confirmed) {
 											ClientPlayNetworking.send(new DeleteCategoryPayload(category));
@@ -826,9 +828,8 @@ public class QuestScreen extends Screen {
 			else if (Registries.ENTITY_TYPE.containsId(id)) {
 				return Registries.ENTITY_TYPE.get(id).getName().getString();
 			}
-			// If it's a Biome, Dimension, Structure or Loot Table
+			// If it's a Biome, Dimension or Structure
 			else {
-                if (target.equals("#pacpackquests:loot_chest")) return I18n.translate("pacpackquests.any_loot_chest");
 				String path = id.getPath();
 				return path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
 			}
