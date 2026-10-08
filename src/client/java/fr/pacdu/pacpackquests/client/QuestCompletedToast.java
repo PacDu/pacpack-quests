@@ -22,7 +22,6 @@ public class QuestCompletedToast implements Toast {
     private final QuestDefinition quest;
     private boolean soundPlayed = false;
 
-    // New variables required by the 1.21.2+ Toast interface
     private Visibility visibility = Visibility.SHOW;
     private long startTime = -1;
 
@@ -30,13 +29,11 @@ public class QuestCompletedToast implements Toast {
         this.quest = quest;
     }
 
-    // 1. NEW METHOD: Required by the updated Toast interface to check state
     @Override
     public Visibility getVisibility() {
         return this.visibility;
     }
 
-    // 2. NEW METHOD: Required by the updated Toast interface to handle logic
     @Override
     public void update(ToastManager manager, long time) {
         // Initialize start time on the first frame
@@ -55,7 +52,7 @@ public class QuestCompletedToast implements Toast {
         // Play the satisfying achievement sound only once
         if (!this.soundPlayed) {
             if (MinecraftClient.getInstance().player != null) {
-                MinecraftClient.getInstance().player.playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.0F);
+                MinecraftClient.getInstance().player.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0F, 1.0F);
             }
             this.soundPlayed = true;
         }
