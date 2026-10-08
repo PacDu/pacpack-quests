@@ -53,6 +53,7 @@ public class EditQuestScreen extends Screen {
     private RewardType currentRewardType = RewardType.ITEM;
 
     private String errorMessage = null;
+    private boolean isInitialized = false;
 
     public EditQuestScreen(QuestScreen parent, String questId, String category, int gridX, int gridY) {
         super(Text.literal(questId == null ? I18n.translate("gui.pacpack-quests.create_new_quest") : I18n.translate("gui.pacpack-quests.edit_quest")));
@@ -83,20 +84,23 @@ public class EditQuestScreen extends Screen {
         if (questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) {
             QuestDefinition def = PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
             initialTitle = def.title();
-            this.currentTaskType = def.type();
+            
+            if (!this.isInitialized) {
+                this.currentTaskType = def.type();
+                this.currentRewardType = def.rewardType();
+            }
 
             // Only update these variables if they are empty (to avoid overwriting SelectionScreen callbacks)
             if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = Registries.ITEM.getId(def.icon().getItem()).toString();
             if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
-
-            this.currentRewardType = def.rewardType();
-
             if (this.selectedReward == null || this.selectedReward.equals("minecraft:diamond")) this.selectedReward = Registries.ITEM.getId(def.reward().getItem()).toString();
 
             initialReqAmt = String.valueOf(def.requiredAmount());
             initialRewAmt = String.valueOf(def.rewardAmount());
             if (def.parents() != null) initialParents = String.join(",", def.parents());
         }
+        
+        this.isInitialized = true;
 
         // 2. Override initial values with current field contents (if they exist)
         String currentId = this.idField != null ? this.idField.getText() : "";

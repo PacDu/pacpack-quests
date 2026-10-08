@@ -18,9 +18,11 @@ import net.minecraft.client.resource.language.I18n;
 import net.minecraft.command.DefaultPermissions;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.Rarity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -392,31 +394,56 @@ public class QuestScreen extends Screen {
 		boolean claimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
 		List<Text> tooltip = new ArrayList<>();
+
+		// 1. Title
 		tooltip.add(Text.translatable(quest.title()).formatted(Formatting.GOLD, Formatting.BOLD));
 
+		// 2. Status and Progress
+		MutableText statusLabel = Text.translatable("gui.pacpack-quests.status").append(": ").formatted(Formatting.GRAY);
+
 		if (claimed) {
-			tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.status") + ": " + I18n.translate("gui.pacpack-quests.claimed")).formatted(Formatting.GREEN));
+			tooltip.add(statusLabel.append(Text.translatable("gui.pacpack-quests.claimed").formatted(Formatting.GREEN)));
 		} else if (progress >= requiredAmount) {
-			tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.status") + ": " + I18n.translate("gui.pacpack-quests.ready_to_claim")).formatted(Formatting.YELLOW));
+			tooltip.add(statusLabel.append(Text.translatable("gui.pacpack-quests.ready_to_claim").formatted(Formatting.YELLOW)));
 		} else if (quest.isLocked()) {
-			tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.status") + ": " + I18n.translate("gui.pacpack-quests.locked")).formatted(Formatting.RED));
+			tooltip.add(statusLabel.append(Text.translatable("gui.pacpack-quests.locked").formatted(Formatting.RED)));
 		} else {
-			tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests." + quest.type().toString().toLowerCase()) + ": " + getTranslatedTargetName(quest.target())).formatted(Formatting.GRAY));
-			tooltip.add(Text.literal(I18n.translate("gui.pacpack-quests.progress") + ": " + progress + " / " + requiredAmount).formatted(Formatting.GRAY));
+			// Task target (e.g., Craft: Shield)
+			tooltip.add(Text.translatable("gui.pacpack-quests." + quest.type().toString().toLowerCase())
+					.append(": ")
+					.append(Text.literal(getTranslatedTargetName(quest.target())))
+					.formatted(Formatting.GRAY));
+
+			// Progress (e.g., Progress: 0 / 1)
+			tooltip.add(Text.translatable("gui.pacpack-quests.progress")
+					.append(": " + progress + " / " + requiredAmount)
+					.formatted(Formatting.GRAY));
 		}
 
-		switch (quest.rewardType()) {
-			case XP -> tooltip.add(Text.translatable("gui.pacpack-quests.reward")
-					.append(": " + quest.rewardAmount() + " XP")
-					.formatted(claimed ? Formatting.GREEN : Formatting.LIGHT_PURPLE));
-			case LEVEL -> tooltip.add(Text.translatable("gui.pacpack-quests.reward")
-					.append(": " + quest.rewardAmount() + " ")
-					.append(Text.translatable("gui.pacpack-quests.levels"))
-					.formatted(claimed ? Formatting.GREEN : Formatting.LIGHT_PURPLE));
-			case ITEM -> tooltip.add(Text.translatable("gui.pacpack-quests.reward")
-					.append(": " + quest.rewardAmount() + "x ").append(quest.reward().getName())
-					.formatted(claimed ? Formatting.GREEN : Formatting.AQUA));
+		// 3. Reward
+		// The label always stays gray, regardless of the state
+		MutableText rewardLabel = Text.translatable("gui.pacpack-quests.reward").append(": ").formatted(Formatting.GRAY);
+		MutableText rewardValue;
+
+		if (claimed) {
+			// If claimed: the value is dark gray and struck through
+			rewardValue = switch (quest.rewardType()) {
+				case XP -> Text.literal(quest.rewardAmount() + " XP");
+				case LEVEL -> Text.literal(quest.rewardAmount() + " ").append(Text.translatable("gui.pacpack-quests.levels"));
+				case ITEM -> Text.literal(quest.rewardAmount() + "x ").append(quest.reward().getName());
+			};
+			rewardValue.formatted(Formatting.DARK_GRAY, Formatting.STRIKETHROUGH);
+		} else {
+			// If not claimed: apply the proper colors (Green for XP, Rarity for Items)
+			rewardValue = switch (quest.rewardType()) {
+				case XP -> Text.literal(quest.rewardAmount() + " XP").formatted(Formatting.GREEN);
+				case LEVEL -> Text.literal(quest.rewardAmount() + " ").append(Text.translatable("gui.pacpack-quests.levels")).formatted(Formatting.DARK_GREEN, Formatting.BOLD);
+				case ITEM -> Text.literal(quest.rewardAmount() + "x ").append(quest.reward().getName()).formatted(quest.reward().getRarity().getFormatting());
+			};
 		}
+
+		// Assemble the label (gray) and the value (colored)
+		tooltip.add(rewardLabel.append(rewardValue));
 
 		context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
 	}
