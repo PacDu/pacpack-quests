@@ -9,7 +9,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ConfirmScreen;
-import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
@@ -22,16 +21,14 @@ import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.Rarity;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.*;
 
-public class QuestScreen extends Screen {
+public class QuestScreen extends AbstractQuestGridScreen {
 
-	private int windowWidth, windowHeight, startX, startY;
 	private final List<QuestNode> questList = new ArrayList<>();
 
 	private static String selectedCategory = "main";
@@ -41,14 +38,6 @@ public class QuestScreen extends Screen {
 	private ButtonWidget claimAllButton;
 	private TextFieldWidget inlineCategoryField;
 
-	// --- Camera & Canvas System ---
-	private static double panX = 0;
-	private static double panY = 0;
-	private static float zoom = 1.0f;
-	private final int gridSpacing = 48;
-	private final int canvasOffsetX = 20;
-	private final int canvasOffsetY = 20;
-
 	// --- Edit Mode System ---
 	private boolean isEditMode = false;
 	private String draggedQuestId = null;
@@ -57,7 +46,7 @@ public class QuestScreen extends Screen {
 	private String draggedCategory = null;
 	private final ScrollbarWidget categoryScrollbar = new ScrollbarWidget(0, 0, 6, 0, 25, true);
 
-	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) {}
+	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) implements GridNode {}
 
 	public QuestScreen() {
 		super(Text.translatable("gui.pacpack-quests.quest_menu"));
@@ -71,11 +60,6 @@ public class QuestScreen extends Screen {
 	@Override
 	protected void init() {
 		super.init();
-
-		windowWidth = this.width - 2 * this.tabWidth;
-		windowHeight = this.height - 80;
-		startX = (this.width - windowWidth) / 2 + 40;
-		startY = (this.height - windowHeight) / 2 - 10;
 
 		int buttonWidth = 100;
 		int buttonHeight = 20;
@@ -159,9 +143,7 @@ public class QuestScreen extends Screen {
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
-
-		context.fill(startX, startY, startX + windowWidth, startY + windowHeight, 0xAA000000);
-		context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, startY - 18, -1);
+		super.drawBackgroundFrame(context, this.title);
 
 		// --- DRAW CATEGORIES ---
 		int categMarginTop = 20;
@@ -300,7 +282,7 @@ public class QuestScreen extends Screen {
 			for (String parentId : quest.parents()) {
 				QuestNode parentNode = getQuestById(parentId);
 				if (parentNode != null) {
-					drawConnectionLine(context, parentNode, quest);
+					int lineColor = quest.isLocked() ? 0xFF444444 : 0xFF88AA88; int arrowColor = quest.isLocked() ? 0xFF888888 : 0xFFCCFFCC; boolean isDragging = parentNode.id().equals(draggedQuestId) || quest.id().equals(draggedQuestId); drawConnectionLine(context, parentNode, quest, lineColor, arrowColor, isDragging);
 				}
 			}
 		}
@@ -368,9 +350,7 @@ public class QuestScreen extends Screen {
 		if (isEditMode && checkHover && isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 			bgColor = 0xFF666666;
 		}
-
-		context.fill(quest.x() - 4, quest.y() - 4, quest.x() + 20, quest.y() + 20, bgColor);
-		context.drawItem(quest.icon(), quest.x(), quest.y());
+		super.renderNodeBase(context, quest, bgColor);
 
 		Text textToDraw;
 		int textColor;
@@ -448,55 +428,6 @@ public class QuestScreen extends Screen {
 		context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
 	}
 
-	private void drawConnectionLine(DrawContext context, QuestNode parent, QuestNode child) {
-		int px = parent.x() + 8;
-		int py = parent.y() + 8;
-		int cx = child.x() + 8;
-		int cy = child.y() + 8;
-
-		// If either node is being dragged, visually disconnect the lines to avoid messy rendering
-		if (parent.id().equals(draggedQuestId) || child.id().equals(draggedQuestId)) return;
-
-		int lineColor = child.isLocked() ? 0xFF444444 : 0xFF88AA88;
-
-		// Use brighter colors for the arrows so they pop out against the line and background
-		int arrowColor = child.isLocked() ? 0xFF888888 : 0xFFCCFFCC;
-		int thickness = 2;
-
-		// Calculate distance and angle between the two points
-		float dx = cx - px;
-		float dy = cy - py;
-		float length = (float) Math.sqrt(dx * dx + dy * dy);
-		float angle = (float) Math.atan2(dy, dx);
-
-		// Apply rotation and translation to draw a straight line
-		context.getMatrices().pushMatrix();
-		context.getMatrices().translate((float) px, (float) py);
-		context.getMatrices().rotate(angle);
-
-		// 1. Draw the main line
-		context.fill(0, -thickness / 2, (int) length, thickness / 2, lineColor);
-
-		// 2. Draw one perfect arrow in the middle
-		drawArrowChevron(context, (int) (length / 2) + 4, arrowColor);
-
-		context.getMatrices().popMatrix();
-	}
-
-	// Helper method to draw a crisp, pixel-art style chevron (>)
-	private void drawArrowChevron(DrawContext context, int x, int color) {
-		// Tip of the arrow (overlaps exactly with the line)
-		context.fill(x, -1, x + 2, 1, color);
-
-		// Inner wings
-		context.fill(x - 2, -3, x, -1, color);
-		context.fill(x - 2, 1, x, 3, color);
-
-		// Outer wings
-		context.fill(x - 4, -5, x - 2, -3, color);
-		context.fill(x - 4, 3, x - 2, 5, color);
-	}
-
 	private QuestNode getQuestById(String id) {
 		for (QuestNode node : questList) {
 			if (node.id().equals(id)) return node;
@@ -513,7 +444,7 @@ public class QuestScreen extends Screen {
 		boolean isMouseInWindow = mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight;
 
 		if (click.button() == 0) { // Left Click
-			if (categoryScrollbar.mouseClicked(mouseX, mouseY, click.button())) {
+			if (categoryScrollbar.mouseClicked(mouseX, mouseY, 0)) {
 				if (this.inlineCategoryField.isVisible()) {
 					this.inlineCategoryField.setVisible(false);
 					this.categoryEditTarget = null;
@@ -663,12 +594,6 @@ public class QuestScreen extends Screen {
 			return true;
 		}
 
-		if (click.x() >= startX && click.x() <= startX + windowWidth && click.y() >= startY && click.y() <= startY + windowHeight) {
-			panX += offsetX;
-			panY += offsetY;
-			clampPanning();
-			return true;
-		}
 		return super.mouseDragged(click, offsetX, offsetY);
 	}
 
@@ -774,22 +699,6 @@ public class QuestScreen extends Screen {
 			}
 		}
 
-		if (mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight) {
-			double oldZoom = zoom;
-			zoom += (float) (verticalAmount * 0.15f);
-			zoom = Math.clamp(zoom, 0.3f, 2f);
-
-			double zoomRatio = zoom / oldZoom;
-			double relX = mouseX - startX;
-			double relY = mouseY - startY;
-
-			panX = relX - (relX - panX) * zoomRatio;
-			panY = relY - (relY - panY) * zoomRatio;
-
-			clampPanning();
-
-			return true;
-		}
 		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
 	}
 
@@ -825,15 +734,6 @@ public class QuestScreen extends Screen {
 		return super.keyPressed(input);
 	}
 
-	private boolean isHovering(int x, int y, int width, int height, double localMouseX, double localMouseY) {
-		return localMouseX >= x && localMouseX <= x + width &&
-				localMouseY >= y && localMouseY <= y + height;
-	}
-
-	private boolean isHoveringNode(int nodeX, int nodeY, double localMouseX, double localMouseY) {
-		return isHovering(nodeX - 4, nodeY - 4, 24, 24, localMouseX, localMouseY);
-	}
-
 	private String getTranslatedTargetName(String target) {
 		if (target.startsWith("#")) {
 			String tagKey = "tag." + target.substring(1).replace(":", ".");
@@ -863,67 +763,9 @@ public class QuestScreen extends Screen {
 		}
 	}
 
-	// Keeps the camera within the bounds of the 20x20 grid
-	private void clampPanning() {
-		double currentMinPanX, currentMaxPanX;
-		double currentMinPanY, currentMaxPanY;
-
-		// Edit Mode or empty category: keep the full 20x20 grid limits
-		if (isEditMode || questList.isEmpty()) {
-			double canvasPixelWidth = 20 * gridSpacing;
-			double canvasPixelHeight = 20 * gridSpacing;
-
-			double boundX1 = 0;
-			double boundX2 = windowWidth - (canvasPixelWidth * zoom);
-
-			double boundY1 = 0;
-			double boundY2 = windowHeight - (canvasPixelHeight * zoom);
-
-			// Using Math.min and Math.max ensures the minimum is always strictly lower than the maximum,
-			// which prevents Math.clamp() from throwing an IllegalArgumentException when zooming out.
-			currentMinPanX = Math.min(boundX1, boundX2);
-			currentMaxPanX = Math.max(boundX1, boundX2);
-			currentMinPanY = Math.min(boundY1, boundY2);
-			currentMaxPanY = Math.max(boundY1, boundY2);
-		}
-		// Player Mode: restrict the camera dynamically to the existing quests
-		else {
-			int minX = Integer.MAX_VALUE;
-			int maxX = Integer.MIN_VALUE;
-			int minY = Integer.MAX_VALUE;
-			int maxY = Integer.MIN_VALUE;
-
-			// 1. Find the extreme coordinates of all quests in the current category
-			for (QuestNode quest : questList) {
-				// "- 4" and "+ 20" correspond to the actual rendering size of the nodes (24x24)
-				minX = Math.min(minX, quest.x() - 4);
-				maxX = Math.max(maxX, quest.x() + 20);
-				minY = Math.min(minY, quest.y() - 4);
-				maxY = Math.max(maxY, quest.y() + 20);
-			}
-
-			// 2. Add padding so the camera doesn't stop abruptly on the edge of the icons
-			int padding = 20;
-			minX -= padding;
-			maxX += padding;
-			minY -= padding;
-			maxY += padding;
-
-			// 3. Calculate dynamic bounds based on the current zoom level and window size
-			double boundX1 = -minX * zoom;
-			double boundX2 = windowWidth - maxX * zoom;
-			currentMinPanX = Math.min(boundX1, boundX2);
-			currentMaxPanX = Math.max(boundX1, boundX2);
-
-			double boundY1 = -minY * zoom;
-			double boundY2 = windowHeight - maxY * zoom;
-			currentMinPanY = Math.min(boundY1, boundY2);
-			currentMaxPanY = Math.max(boundY1, boundY2);
-		}
-
-		// 4. Safely apply the calculated limits to the camera
-		panX = Math.clamp(panX, currentMinPanX, currentMaxPanX);
-		panY = Math.clamp(panY, currentMinPanY, currentMaxPanY);
+	@Override
+	protected java.util.List<? extends GridNode> getNodes() {
+		return this.questList;
 	}
 
 	private void claimAllQuests() {

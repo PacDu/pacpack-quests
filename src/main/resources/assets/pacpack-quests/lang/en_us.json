@@ -11,7 +11,6 @@
 
   "form.pacpack-quests.icon_item_id": "Icon",
   "form.pacpack-quests.parents": "Parents IDs (Comma separated)",
-  "form.pacpack-quests.parents_placeholder": "quest_1, quest_2",
   "form.pacpack-quests.quest_id": "Quest ID",
   "form.pacpack-quests.quest_id_placeholder": "my_first_quest",
   "form.pacpack-quests.required_amount": "Required Amount",
@@ -24,6 +23,8 @@
   "form.pacpack-quests.title_placeholder": "Getting Started",
 
   "gui.pacpack-quests.cancel": "Cancel",
+  "gui.pacpack-quests.cannot_select_child": "Cannot select a descendant quest!",
+  "gui.pacpack-quests.cannot_select_self": "Cannot select this quest as its own parent!",
   "gui.pacpack-quests.claim_all": "Claim All",
   "gui.pacpack-quests.claimed": "Finished !",
   "gui.pacpack-quests.click_drag": "Left Click & Drag",
@@ -53,6 +54,7 @@
   "gui.pacpack-quests.save": "Save",
   "gui.pacpack-quests.search": "Search...",
   "gui.pacpack-quests.select_element": "Select an Element",
+  "gui.pacpack-quests.select_parents": "Select Parents",
   "gui.pacpack-quests.status": "Status",
   "gui.pacpack-quests.to_add": "to Add a New Quest",
   "gui.pacpack-quests.to_edit_delete": "to Edit/Delete",

@@ -11,7 +11,6 @@
 
   "form.pacpack-quests.icon_item_id": "Icône",
   "form.pacpack-quests.parents": "IDs des Parents (Séparés d'une virgule)",
-  "form.pacpack-quests.parents_placeholder": "quete_1, quete_2",
   "form.pacpack-quests.quest_id": "ID de la Quête",
   "form.pacpack-quests.quest_id_placeholder": "ma_premiere_quete",
   "form.pacpack-quests.required_amount": "Quantité Requise",
@@ -24,6 +23,8 @@
   "form.pacpack-quests.title_placeholder": "Bien commencer",
 
   "gui.pacpack-quests.cancel": "Annuler",
+  "gui.pacpack-quests.cannot_select_child": "Ne peut sélectionner un enfant !",
+  "gui.pacpack-quests.cannot_select_self": "Ne peut ȇtre son propre parent !",
   "gui.pacpack-quests.claim_all": "Tout Récupérer",
   "gui.pacpack-quests.claimed": "Terminé !",
   "gui.pacpack-quests.click_drag": "Clic Gauche et Déplacer",
@@ -53,6 +54,7 @@
   "gui.pacpack-quests.save": "Sauvegarder",
   "gui.pacpack-quests.search": "Rechercher...",
   "gui.pacpack-quests.select_element": "Sélectionner un Élément",
+  "gui.pacpack-quests.select_parents": "Sélectionner les Parents",
   "gui.pacpack-quests.status": "Statut",
   "gui.pacpack-quests.to_add": "pour Ajouter une Nouvelle Quête",
   "gui.pacpack-quests.to_edit_delete": "pour Modifier/Supprimer",

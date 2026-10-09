@@ -35,7 +35,8 @@ public class EditQuestScreen extends Screen {
     private final int gridX, gridY;
 
     // Standard Text Fields
-    private TextFieldWidget idField, titleField, reqAmountField, rewardAmountField, parentsField;
+    private TextFieldWidget idField, titleField, reqAmountField, rewardAmountField;
+    private ButtonWidget parentsButton;
 
     // Custom Selection Buttons (Replaced the TextFields)
     private ButtonWidget targetButton, iconButton, rewardButton, taskTypeButton;
@@ -53,6 +54,11 @@ public class EditQuestScreen extends Screen {
     private RewardType currentRewardType = RewardType.ITEM;
 
     private String errorMessage = null;
+    private java.util.List<String> selectedParents = new java.util.ArrayList<>();
+
+    public void updateParents(java.util.List<String> parents) {
+        this.selectedParents = new java.util.ArrayList<>(parents);
+    }
     private boolean isInitialized = false;
 
     public EditQuestScreen(QuestScreen parent, String questId, String category, int gridX, int gridY) {
@@ -97,7 +103,7 @@ public class EditQuestScreen extends Screen {
 
             initialReqAmt = String.valueOf(def.requiredAmount());
             initialRewAmt = String.valueOf(def.rewardAmount());
-            if (def.parents() != null) initialParents = String.join(",", def.parents());
+            if (def.parents() != null) { initialParents = String.join(",", def.parents()); if (!this.isInitialized) { this.selectedParents = new java.util.ArrayList<>(def.parents()); } }
         }
         
         this.isInitialized = true;
@@ -107,7 +113,7 @@ public class EditQuestScreen extends Screen {
         if (this.titleField != null) initialTitle = this.titleField.getText();
         if (this.reqAmountField != null) initialReqAmt = this.reqAmountField.getText();
         if (this.rewardAmountField != null) initialRewAmt = this.rewardAmountField.getText();
-        if (this.parentsField != null) initialParents = this.parentsField.getText();
+        if (this.selectedParents != null) initialParents = String.join(",", this.selectedParents);
 
         // ROW 1: ID & Icon Button
         this.idField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.quest_id"));
@@ -137,10 +143,10 @@ public class EditQuestScreen extends Screen {
         this.titleField.setPlaceholder(Text.translatable("form.pacpack-quests.title_placeholder").formatted(Formatting.DARK_GRAY));
         this.addDrawableChild(this.titleField);
 
-        this.parentsField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.parents"));
-        this.parentsField.setText(initialParents);
-        this.parentsField.setPlaceholder(Text.translatable("form.pacpack-quests.parents_placeholder").formatted(Formatting.DARK_GRAY));
-        this.addDrawableChild(this.parentsField);
+        this.parentsButton = ButtonWidget.builder(Text.literal(initialParents.isEmpty() ? "None" : initialParents.split(",").length + " parents"), button -> {
+            this.client.setScreen(new ParentSelectionScreen(this, this.idField.getText(), this.category, this.selectedParents));
+        }).dimensions(col2, y, fieldWidth, 20).build();
+        this.addDrawableChild(this.parentsButton);
 
         // ROW 3: Task Type & Reward Type Toggles
         y += yStep - 10;
@@ -272,7 +278,7 @@ public class EditQuestScreen extends Screen {
         this.titleField.setEditableColor(0xFFE0E0E0);
         this.reqAmountField.setEditableColor(0xFFE0E0E0);
         this.rewardAmountField.setEditableColor(0xFFE0E0E0);
-        this.parentsField.setEditableColor(0xFFE0E0E0);
+        
 
         String finalId = this.idField.getText().trim();
         if (finalId.isEmpty() || !finalId.matches("^[a-z0-9_]+$")) {
@@ -325,18 +331,18 @@ public class EditQuestScreen extends Screen {
         }
 
         ArrayList<String> parentsList = new ArrayList<>();
-        String parentsStr = this.parentsField.getText().trim();
+        String parentsStr = String.join(",", this.selectedParents);
         if (!parentsStr.isEmpty()) {
             for (String p : parentsStr.split(",")) {
                 String parentId = p.trim();
                 if (parentId.equals(finalId)) {
                     this.errorMessage = "error.pacpack-quests.self_parent";
-                    this.parentsField.setEditableColor(0xFFFF5555);
+                    
                     return;
                 }
                 if (!PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(parentId)) {
                     this.errorMessage = "error.pacpack-quests.unknown_parent";
-                    this.parentsField.setEditableColor(0xFFFF5555);
+                    
                     return;
                 }
                 parentsList.add(parentId);
@@ -439,7 +445,7 @@ public class EditQuestScreen extends Screen {
 
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.required_amount"), this.reqAmountField.getX(), this.reqAmountField.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_amount"), this.rewardAmountField.getX(), this.rewardAmountField.getY() - 10, 0xFFFFFFFF, true);
-        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.parents"), this.parentsField.getX(), this.parentsField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.parents"), this.parentsButton.getX(), this.parentsButton.getY() - 10, 0xFFFFFFFF, true);
 
         if (this.errorMessage != null) {
             context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(this.errorMessage).formatted(Formatting.RED, Formatting.BOLD), this.width / 2, this.height - 52, 0xFFFFFFFF);
