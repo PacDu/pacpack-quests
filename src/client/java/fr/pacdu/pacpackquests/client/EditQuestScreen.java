@@ -22,6 +22,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Locale;
 
@@ -116,14 +117,25 @@ public class EditQuestScreen extends Screen {
         if (this.selectedParents != null) initialParents = String.join(",", this.selectedParents);
 
         // ROW 1: ID & Icon Button
-        this.idField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.quest_id"));
+        this.idField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, 20, Text.translatable("form.pacpack-quests.quest_id")) {
+            @Override
+            public void write(String text) {
+                String formatted = text.toLowerCase(Locale.ROOT)
+                        .replace("œ", "oe")
+                        .replace("æ", "ae");
+                formatted = Normalizer.normalize(formatted, Normalizer.Form.NFD)
+                        .replaceAll("\\p{M}", "")
+                        .replace(' ', '_')
+                        .replaceAll("[^a-z0-9_]", "");
+                super.write(formatted);
+            }
+        };
         if (questId != null) {
             this.idField.setText(questId);
             this.idField.setEditable(false);
         } else {
             // Restore the ID typed during the creation of a new quest
             this.idField.setText(currentId);
-            this.idField.setTextPredicate(text -> text.matches("^[a-z0-9_]*$"));
             this.idField.setPlaceholder(Text.translatable("form.pacpack-quests.quest_id_placeholder").formatted(Formatting.DARK_GRAY));
         }
         this.addDrawableChild(this.idField);
