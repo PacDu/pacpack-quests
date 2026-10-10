@@ -83,28 +83,43 @@ public abstract class AbstractQuestGridScreen extends Screen {
 
     protected abstract List<? extends GridNode> getNodes();
 
+    protected boolean forceFullGridBounds() {
+        return false;
+    }
+
+    // Grid size for edit mode constraints
+    protected int maxGridColumns = 20;
+    protected int maxGridRows = 20;
+
     protected void clampPanning() {
         double currentMinPanX, currentMaxPanX;
         double currentMinPanY, currentMaxPanY;
 
         List<? extends GridNode> nodes = getNodes();
 
-        if (nodes == null || nodes.isEmpty()) {
-            currentMinPanX = currentMaxPanX = currentMinPanY = currentMaxPanY = 0;
-        } else {
-            int minX = Integer.MAX_VALUE;
-            int maxX = Integer.MIN_VALUE;
-            int minY = Integer.MAX_VALUE;
-            int maxY = Integer.MIN_VALUE;
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxY = Integer.MIN_VALUE;
 
+        if (forceFullGridBounds()) {
+            minX = canvasOffsetX - 4;
+            maxX = canvasOffsetX + (maxGridColumns - 1) * gridSpacing + 28;
+            minY = canvasOffsetY - 4;
+            maxY = canvasOffsetY + (maxGridRows - 1) * gridSpacing + 28;
+        } else if (nodes != null && !nodes.isEmpty()) {
             for (GridNode node : nodes) {
                 minX = Math.min(minX, node.x() - 4);
                 maxX = Math.max(maxX, node.x() + 20);
                 minY = Math.min(minY, node.y() - 4);
                 maxY = Math.max(maxY, node.y() + 20);
             }
+        }
 
-            int padding = 20;
+        if (minX == Integer.MAX_VALUE) {
+            currentMinPanX = currentMaxPanX = currentMinPanY = currentMaxPanY = 0;
+        } else {
+            int padding = 16;
             minX -= padding;
             maxX += padding;
             minY -= padding;

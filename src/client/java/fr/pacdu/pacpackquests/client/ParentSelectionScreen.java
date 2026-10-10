@@ -4,8 +4,11 @@ import fr.pacdu.pacpackquests.QuestDefinition;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,12 +32,21 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
     
     private final List<SelectionNode> nodes = new ArrayList<>();
 
-    public ParentSelectionScreen(EditQuestScreen parentScreen, String questId, String currentCategory, List<String> initialParents) {
+    private final String tempTitle;
+    private final int tempX;
+    private final int tempY;
+    private final String tempIcon;
+
+    public ParentSelectionScreen(EditQuestScreen parentScreen, String questId, String currentCategory, List<String> initialParents, String tempTitle, int tempX, int tempY, String tempIcon) {
         super(Text.translatable("gui.pacpack-quests.select_parents"));
         this.parentScreen = parentScreen;
         this.questId = questId;
         this.currentCategory = currentCategory;
         this.selectedParents = new ArrayList<>(initialParents);
+        this.tempTitle = tempTitle;
+        this.tempX = tempX;
+        this.tempY = tempY;
+        this.tempIcon = tempIcon;
     }
 
     @Override
@@ -42,12 +54,27 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         super.init(); // This now identical to QuestScreen bounds
         
         nodes.clear();
+        boolean foundSelf = false;
         for (QuestDefinition def : CLIENT_DEFINITIONS.values()) {
             if (def.category().equals(this.currentCategory)) {
+                if (def.id().equals(this.questId)) foundSelf = true;
                 int nodeX = canvasOffsetX + (def.displayX() * gridSpacing) + 8;
                 int nodeY = canvasOffsetY + (def.displayY() * gridSpacing) + 8;
                 nodes.add(new SelectionNode(def.id(), def.title(), nodeX, nodeY, def.parents(), def.icon().getItem().getDefaultStack()));
             }
+        }
+
+        if (!foundSelf && this.questId != null) {
+            int nodeX = canvasOffsetX + (this.tempX * gridSpacing) + 8;
+            int nodeY = canvasOffsetY + (this.tempY * gridSpacing) + 8;
+            ItemStack iconStack = Items.STONE.getDefaultStack();
+            if (this.tempIcon != null) {
+                Identifier id = Identifier.tryParse(this.tempIcon);
+                if (id != null && Registries.ITEM.containsId(id)) {
+                    iconStack = Registries.ITEM.get(id).getDefaultStack();
+                }
+            }
+            nodes.add(new SelectionNode(this.questId, this.tempTitle != null && !this.tempTitle.trim().isEmpty() ? this.tempTitle : this.questId, nodeX, nodeY, this.selectedParents, iconStack));
         }
 
         int buttonWidth = 100;
@@ -166,7 +193,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         }
     }
 
-    private void renderNode(DrawContext context, SelectionNode node, double localMouseX, double localMouseY) {
+    private void renderNode(DrawContext context, SelectionNode node, double localMouseX, double localMouseY) { //
         boolean isSelected = selectedParents.contains(node.id());
         boolean isDescendant = isDescendant(node.id(), questId, new java.util.HashSet<>());
         int bgColor = 0xFF555555;

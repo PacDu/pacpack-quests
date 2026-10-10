@@ -254,8 +254,8 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		// Draw Helper Grid in Edit Mode
 		if (isEditMode) {
-			for (int gx = 0; gx < 20; gx++) {
-				for (int gy = 0; gy < 20; gy++) {
+			for (int gx = 0; gx < maxGridColumns; gx++) {
+				for (int gy = 0; gy < maxGridRows; gy++) {
 					int bgColor = 0x11FFFFFF;
 					int bgX = canvasOffsetX + (gx * gridSpacing);
 					int bgY = canvasOffsetY + (gy * gridSpacing);
@@ -544,11 +544,14 @@ public class QuestScreen extends AbstractQuestGridScreen {
 						return true;
 					}
 				}
-				// Create new quest on empty space
-				int gridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
-				int gridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
-				MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, gridX, gridY));
-				return true;
+
+				if ((localMouseX - 16) % 48 < 24 && (localMouseY - 16) % 48 < 24) {
+					// Create new quest on empty space
+					int gridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
+					int gridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
+					MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, gridX, gridY));
+					return true;
+				}
 			}
 		}
 
@@ -761,6 +764,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				return path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
 			}
 		}
+	}
+
+	@Override
+	protected boolean forceFullGridBounds() {
+		return this.isEditMode;
 	}
 
 	@Override
