@@ -4,6 +4,8 @@ import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.network.*;
+import fr.pacdu.pacpackquests.util.RegistryType;
+import fr.pacdu.pacpackquests.client.util.TranslationUtils;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
@@ -46,7 +48,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	private String draggedCategory = null;
 	private final ScrollbarWidget categoryScrollbar = new ScrollbarWidget(0, 0, 6, 0, 25, true);
 
-	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, ItemStack reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) implements GridNode {}
+	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, String reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) implements GridNode {}
 
 	public QuestScreen() {
 		super(Text.translatable("gui.pacpack-quests.quest_menu"));
@@ -410,7 +412,8 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			rewardValue = switch (quest.rewardType()) {
 				case XP -> Text.literal(quest.rewardAmount() + " XP");
 				case LEVEL -> Text.literal(quest.rewardAmount() + " ").append(Text.translatable("gui.pacpack-quests.levels"));
-				case ITEM -> Text.literal(quest.rewardAmount() + "x ").append(quest.reward().getName());
+				case ITEM -> Text.literal(quest.rewardAmount() + "x ").append(TranslationUtils.getTranslatedName(quest.reward(), RegistryType.ITEM));
+				case ENCHANTED_BOOK -> Text.literal(quest.rewardAmount() + "x ").append(TranslationUtils.getTranslatedName(quest.reward(), RegistryType.ENCHANTMENT));
 			};
 			rewardValue.formatted(Formatting.DARK_GRAY, Formatting.STRIKETHROUGH);
 		} else {
@@ -418,7 +421,8 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			rewardValue = switch (quest.rewardType()) {
 				case XP -> Text.literal(quest.rewardAmount() + " XP").formatted(Formatting.GREEN);
 				case LEVEL -> Text.literal(quest.rewardAmount() + " ").append(Text.translatable("gui.pacpack-quests.levels")).formatted(Formatting.DARK_GREEN, Formatting.BOLD);
-				case ITEM -> Text.literal(quest.rewardAmount() + "x ").append(quest.reward().getName()).formatted(quest.reward().getRarity().getFormatting());
+				case ITEM -> Text.literal(quest.rewardAmount() + "x ").append(TranslationUtils.getTranslatedName(quest.reward(), RegistryType.ITEM)).formatted(Formatting.WHITE);
+				case ENCHANTED_BOOK -> Text.literal(quest.rewardAmount() + "x ").append(TranslationUtils.getTranslatedName(quest.reward(), RegistryType.ENCHANTMENT)).formatted(Formatting.LIGHT_PURPLE);
 			};
 		}
 

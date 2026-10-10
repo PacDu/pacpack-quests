@@ -10,6 +10,7 @@ import fr.pacdu.pacpackquests.data.QuestState;
 import fr.pacdu.pacpackquests.network.*;
 
 import fr.pacdu.pacpackquests.util.RegistryType;
+import fr.pacdu.pacpackquests.util.RewardUtils;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -63,7 +64,7 @@ public class PacPackQuests implements ModInitializer {
 
 		LOGGER.info("Initializing PacPack Quests...");
 		ModConfig.load();
-		ServerLifecycleEvents.SERVER_STARTING.register(server -> QuestManager.loadQuests());
+		ServerLifecycleEvents.SERVER_STARTING.register(QuestManager::loadQuests);
 
 		PayloadTypeRegistry.playS2C().register(QuestSyncPayload.ID, QuestSyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(QuestProgressPayload.ID, QuestProgressPayload.CODEC);
@@ -110,7 +111,7 @@ public class PacPackQuests implements ModInitializer {
 						quest.target(),
 						quest.requiredAmount(),
 						Registries.ITEM.getId(quest.icon().getItem()).toString(),
-						Registries.ITEM.getId(quest.reward().getItem()).toString(),
+						quest.reward(),
 						quest.rewardType(),
 						quest.rewardAmount(),
 						quest.parents(),
@@ -342,11 +343,14 @@ public class PacPackQuests implements ModInitializer {
 
                         case LEVEL -> player.addExperienceLevels(quest.rewardAmount());
 
-                        case ITEM -> {
-                            if (quest.rewardAmount() > 0 && !quest.reward().isEmpty()) {
-                                ItemStack rewardStack = new ItemStack(quest.reward().getItem(), quest.rewardAmount());
-                                if (!player.getInventory().insertStack(rewardStack)) {
-                                    player.dropItem(rewardStack, false);
+                        case ITEM, ENCHANTED_BOOK -> {
+                            if (quest.rewardAmount() > 0 && quest.reward() != null && !quest.reward().isEmpty()) {
+                                ItemStack rewardStack = RewardUtils.createRewardStack(quest.reward(), quest.rewardType(), context.server().getRegistryManager());
+                                if (!rewardStack.isEmpty()) {
+                                    rewardStack.setCount(quest.rewardAmount());
+                                    if (!player.getInventory().insertStack(rewardStack)) {
+                                        player.dropItem(rewardStack, false);
+                                    }
                                 }
                             }
                         }
@@ -399,7 +403,7 @@ public class PacPackQuests implements ModInitializer {
                             newDef.id(), newDef.title(), newDef.category(), newDef.type(),
                             newDef.target(), newDef.requiredAmount(),
                             Registries.ITEM.getId(newDef.icon().getItem()).toString(),
-                            Registries.ITEM.getId(newDef.reward().getItem()).toString(),
+                            newDef.reward(),
                             newDef.rewardType(), newDef.rewardAmount(), newDef.parents(),
                             payload.newX(), payload.newY()
                     );
@@ -432,7 +436,7 @@ public class PacPackQuests implements ModInitializer {
             switch (payload.rewardType()) {
                 case XP -> json.addProperty("reward", "xp");
                 case LEVEL -> json.addProperty("reward", "level");
-                case ITEM -> json.addProperty("reward", payload.rewardId());
+                case ITEM, ENCHANTED_BOOK -> json.addProperty("reward", payload.reward());
             }
             json.addProperty("rewardAmount", payload.rewardAmount());
 
@@ -450,7 +454,7 @@ public class PacPackQuests implements ModInitializer {
                 QuestDefinition newDef = new QuestDefinition(
                         payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
                         payload.requiredAmount(), new ItemStack(Registries.ITEM.get(Identifier.of(payload.iconId()))),
-                        new ItemStack(Registries.ITEM.get(Identifier.of(payload.rewardId()))), payload.rewardType(),
+                        payload.reward(), payload.rewardType(),
                         payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
                 );
                 QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
@@ -458,7 +462,7 @@ public class PacPackQuests implements ModInitializer {
                 // Sync to players
                 QuestSyncPayload syncPacket = new QuestSyncPayload(
                         payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
-                        payload.requiredAmount(), payload.iconId(), payload.rewardId(), payload.rewardType(),
+                        payload.requiredAmount(), payload.iconId(), payload.reward(), payload.rewardType(),
                         payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
                 );
                 context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));

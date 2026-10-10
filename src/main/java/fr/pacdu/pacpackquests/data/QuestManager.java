@@ -12,6 +12,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.Identifier;
 
 import java.nio.file.Files;
@@ -29,6 +30,10 @@ public class QuestManager {
     public static final Map<String, QuestDefinition> LOADED_QUESTS = new HashMap<>();
     private static final Gson GSON = new Gson();
     private static final List<String> QUEST_DEFINITION_REQUIDED_LIST = Arrays.asList("title", "type", "target", "requiredAmount", "icon", "reward", "rewardAmount", "displayX",  "displayY");
+
+    public static void loadQuests(MinecraftServer server) {
+        loadQuests();
+    }
 
     public static void loadQuests() {
         LOADED_QUESTS.clear();
@@ -100,18 +105,16 @@ public class QuestManager {
         String rewardStr = json.get("reward").getAsString();
 
         RewardType rewardType;
-        Item rewardItem;
 
         if (rewardStr.equalsIgnoreCase("xp")) {
             rewardType = RewardType.XP;
-            rewardItem = net.minecraft.item.Items.EXPERIENCE_BOTTLE;
         } else if (rewardStr.equalsIgnoreCase("level") || rewardStr.equalsIgnoreCase("levels")) {
             rewardType = RewardType.LEVEL;
-            // We can use an enchanted book to visually differentiate Levels from raw XP points
-            rewardItem = net.minecraft.item.Items.ENCHANTED_BOOK;
+        } else if (rewardStr.startsWith("enchanted_book:") || rewardStr.startsWith("minecraft:enchanted_book:")) {
+            rewardType = RewardType.ENCHANTED_BOOK;
         } else {
             rewardType = RewardType.ITEM;
-            rewardItem = Registries.ITEM.get(Identifier.of(rewardStr));
+            Item rewardItem = Registries.ITEM.get(Identifier.of(rewardStr));
             if (Objects.equals(rewardItem.toString(), "minecraft:air")) errorMessage.append(" The reward ").append(json.get("reward")).append(" does not exist,");
         }
 
@@ -141,7 +144,7 @@ public class QuestManager {
 
         QuestDefinition quest = new QuestDefinition(
                 questId, title, category, type, target, requiredAmount, new ItemStack(iconItem),
-                new ItemStack(rewardItem), rewardType, rewardAmount, parents, displayX, displayY
+                rewardStr, rewardType, rewardAmount, parents, displayX, displayY
         );
 
         LOADED_QUESTS.put(questId, quest);

@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.item.Item;
@@ -66,12 +67,10 @@ public class PacPackQuestsClient implements ClientModInitializer {
 
 		ClientPlayNetworking.registerGlobalReceiver(QuestSyncPayload.ID, (payload, context) -> context.client().execute(() -> {
             Item icon = Registries.ITEM.get(Identifier.of(payload.iconId()));
-            Item reward = Registries.ITEM.get(Identifier.of(payload.rewardId()));
-
             // Reconstruct the quest definition with the newly received reward data
             QuestDefinition def = new QuestDefinition(
                     payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
-                    payload.requiredAmount(), new ItemStack(icon), new ItemStack(reward), payload.rewardType(),
+                    payload.requiredAmount(), new ItemStack(icon), payload.reward(), payload.rewardType(),
                     payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
             );
             CLIENT_DEFINITIONS.put(payload.questId(), def);
@@ -160,7 +159,7 @@ public class PacPackQuestsClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(EditCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
             for (QuestDefinition quest : CLIENT_DEFINITIONS.values()) {
                 if (quest.category().equals(payload.categoryOld())) {
-                    QuestDefinition updatedQuest =  new QuestDefinition(quest.id(), quest.title(), payload.categoryNew(),
+                    QuestDefinition updatedQuest = new QuestDefinition(quest.id(), quest.title(), payload.categoryNew(),
                             quest.type(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
                             quest.rewardType(), quest.rewardAmount(), quest.parents(), quest.displayX(), quest.displayY());
                     CLIENT_DEFINITIONS.put(quest.id(), updatedQuest);

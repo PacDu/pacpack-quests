@@ -3,6 +3,7 @@ package fr.pacdu.pacpackquests.client;
 import fr.pacdu.pacpackquests.network.RequestRegistryPayload;
 import fr.pacdu.pacpackquests.util.IconUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
+import fr.pacdu.pacpackquests.util.RewardUtils;
 import fr.pacdu.pacpackquests.util.TagUtils;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
@@ -25,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-import static fr.pacdu.pacpackquests.util.TranslationUtils.getTranslatedName;
+import static fr.pacdu.pacpackquests.client.util.TranslationUtils.getTranslatedName;
 
 public class SelectionScreen extends Screen {
 
@@ -165,6 +166,21 @@ public class SelectionScreen extends Screen {
                     ClientPlayNetworking.send(new RequestRegistryPayload(RegistryType.LOOT_TABLE));
                 }
             }
+            case ENCHANTMENT -> {
+                if (world != null) {
+                    var enchantmentRegistry = world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
+                    for (var entry : enchantmentRegistry.getIndexedEntries()) {
+                        net.minecraft.registry.entry.RegistryEntry<net.minecraft.enchantment.Enchantment> enchEntry = enchantmentRegistry.getEntry(entry.value());
+                        Identifier id = enchantmentRegistry.getId(entry.value());
+                        if (id != null) {
+                            int maxLevel = enchEntry.value().getMaxLevel();
+                            for (int lvl = 1; lvl <= maxLevel; lvl++) {
+                                allEntries.add("enchanted_book:" + id.getNamespace() + ":" + id.getPath() + ":" + lvl);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
 
@@ -233,7 +249,9 @@ public class SelectionScreen extends Screen {
             int cellY = startY + (row * 18);
 
             // Draw Item Icon
-            ItemStack icon = IconUtils.getRepresentativeItem(entryId, this.contextType).getDefaultStack();
+            ItemStack icon = (this.contextType == RegistryType.ENCHANTMENT || entryId.startsWith("enchanted_book:"))
+                    ? RewardUtils.createEnchantedBookStack(entryId, MinecraftClient.getInstance().world != null ? MinecraftClient.getInstance().world.getRegistryManager() : null)
+                    : IconUtils.getRepresentativeItem(entryId, this.contextType).getDefaultStack();
             context.drawItem(icon, cellX + 1, cellY + 1);
 
             // If it's a tag, draw a small yellow '#' overlay
@@ -381,6 +399,7 @@ public class SelectionScreen extends Screen {
             }
             case DIMENSION -> -1; // Dimensions do not have standard numeric IDs; they will be listed in alphabetical order
             case LOOT_TABLE -> -1;
+            case ENCHANTMENT -> -1;
         };
     }
 }

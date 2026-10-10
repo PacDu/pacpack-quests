@@ -26,7 +26,7 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Locale;
 
-import static fr.pacdu.pacpackquests.util.TranslationUtils.getTranslatedName;
+import static fr.pacdu.pacpackquests.client.util.TranslationUtils.getTranslatedName;
 
 public class EditQuestScreen extends Screen {
 
@@ -100,7 +100,7 @@ public class EditQuestScreen extends Screen {
             // Only update these variables if they are empty (to avoid overwriting SelectionScreen callbacks)
             if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = Registries.ITEM.getId(def.icon().getItem()).toString();
             if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
-            if (this.selectedReward == null || this.selectedReward.equals("minecraft:diamond")) this.selectedReward = Registries.ITEM.getId(def.reward().getItem()).toString();
+            if (this.selectedReward == null || this.selectedReward.equals("minecraft:diamond")) this.selectedReward = def.reward();
 
             initialReqAmt = String.valueOf(def.requiredAmount());
             initialRewAmt = String.valueOf(def.rewardAmount());
@@ -172,11 +172,17 @@ public class EditQuestScreen extends Screen {
             int nextOrdinal = (currentRewardType.ordinal() + 1) % RewardType.values().length;
             currentRewardType = RewardType.values()[nextOrdinal];
             button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + I18n.translate("reward.pacpack-quests." + currentRewardType.name().toLowerCase())));
-            this.rewardButton.active = currentRewardType == RewardType.ITEM; // Disable selection if XP/Levels
+            this.rewardButton.active = (currentRewardType == RewardType.ITEM || currentRewardType == RewardType.ENCHANTED_BOOK);
             switch (currentRewardType) {
-                case ITEM, LEVEL -> this.rewardAmountField.setText("1");
+                case ITEM, LEVEL, ENCHANTED_BOOK -> this.rewardAmountField.setText("1");
                 case XP -> this.rewardAmountField.setText("100");
             }
+            if (currentRewardType == RewardType.ENCHANTED_BOOK && (this.selectedReward == null || !this.selectedReward.startsWith("enchanted_book:"))) {
+                this.selectedReward = "enchanted_book:minecraft:protection:1";
+            } else if (currentRewardType == RewardType.ITEM && (this.selectedReward == null || this.selectedReward.startsWith("enchanted_book:"))) {
+                this.selectedReward = "minecraft:diamond";
+            }
+            updateRewardButtonMessage();
         }).dimensions(col2, y, fieldWidth, 20).build());
 
         // ROW 4: Target Button & Reward Button
@@ -198,13 +204,15 @@ public class EditQuestScreen extends Screen {
         }).dimensions(col1, y, fieldWidth, 20).build();
         this.addDrawableChild(this.targetButton);
 
-        this.rewardButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(selectedReward, RegistryType.ITEM))), button -> {
-            this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
+        this.rewardButton = ButtonWidget.builder(Text.literal(""), button -> {
+            RegistryType ctx = (currentRewardType == RewardType.ENCHANTED_BOOK) ? RegistryType.ENCHANTMENT : RegistryType.ITEM;
+            this.client.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedReward = result;
-                this.rewardButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
+                updateRewardButtonMessage();
             }));
         }).dimensions(col2, y, fieldWidth, 20).build();
-        this.rewardButton.active = (currentRewardType == RewardType.ITEM);
+        this.rewardButton.active = (currentRewardType == RewardType.ITEM || currentRewardType == RewardType.ENCHANTED_BOOK);
+        updateRewardButtonMessage();
         this.addDrawableChild(this.rewardButton);
 
         // ROW 5: Amounts
@@ -248,6 +256,12 @@ public class EditQuestScreen extends Screen {
         String formatted = path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
         if (formatted.length() > 18) formatted = formatted.substring(0, 15) + "..."; // Truncate long names
         return isTag ? "# " + formatted : formatted;
+    }
+
+    private void updateRewardButtonMessage() {
+        if (this.rewardButton == null) return;
+        RegistryType ctx = (currentRewardType == RewardType.ENCHANTED_BOOK) ? RegistryType.ENCHANTMENT : RegistryType.ITEM;
+        this.rewardButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(selectedReward, ctx))));
     }
 
     // Validity checks are mostly handled by the selection screen now, but we keep this as a safeguard
@@ -330,7 +344,17 @@ public class EditQuestScreen extends Screen {
             return;
         }
 
-        String finalRewardStr = (currentRewardType == RewardType.ITEM) ? this.selectedReward : "minecraft:air";
+        if (this.currentRewardType == RewardType.ITEM && (this.selectedReward.isEmpty() || !isValidTarget(this.selectedReward, TaskType.OBTAIN_ITEM))) {
+            this.errorMessage = "error.pacpack-quests.invalid_reward_item";
+            return;
+        }
+
+        if (this.currentRewardType == RewardType.ENCHANTED_BOOK && (this.selectedReward.isEmpty() || !this.selectedReward.startsWith("enchanted_book:"))) {
+            this.errorMessage = "error.pacpack-quests.invalid_reward_item";
+            return;
+        }
+
+        String finalRewardStr = (currentRewardType == RewardType.ITEM || currentRewardType == RewardType.ENCHANTED_BOOK) ? this.selectedReward : "minecraft:air";
 
         int rewAmt;
         try {
@@ -452,7 +476,7 @@ public class EditQuestScreen extends Screen {
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.icon_item_id"), this.iconButton.getX(), this.iconButton.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.task_target"), this.targetButton.getX(), this.targetButton.getY() - 10, 0xFFFFFFFF, true);
 
-        if (this.currentRewardType == RewardType.ITEM)
+        if (this.currentRewardType == RewardType.ITEM || this.currentRewardType == RewardType.ENCHANTED_BOOK)
             context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_item"), this.rewardButton.getX(), this.rewardButton.getY() - 10, 0xFFFFFFFF, true);
 
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.required_amount"), this.reqAmountField.getX(), this.reqAmountField.getY() - 10, 0xFFFFFFFF, true);

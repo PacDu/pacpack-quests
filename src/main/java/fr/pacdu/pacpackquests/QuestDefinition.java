@@ -9,6 +9,6 @@ import java.util.List;
  */
 public record QuestDefinition(
         String id, String title, String category, TaskType type, String target,
-        int requiredAmount, ItemStack icon, ItemStack reward, RewardType rewardType,
+        int requiredAmount, ItemStack icon, String reward, RewardType rewardType,
         int rewardAmount, List<String> parents, int displayX, int displayY
 ) {}
