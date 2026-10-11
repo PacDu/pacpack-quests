@@ -4,7 +4,6 @@ import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.network.*;
-import fr.pacdu.pacpackquests.util.RegistryType;
 import fr.pacdu.pacpackquests.client.util.TranslationUtils;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
@@ -403,31 +402,8 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 
 		// 3. Reward
-		// The label always stays gray, regardless of the state
 		MutableText rewardLabel = Text.translatable("gui.pacpack-quests.reward").append(": ").formatted(Formatting.GRAY);
-		MutableText rewardValue;
-
-		if (claimed) {
-			// If claimed: the value is dark gray and struck through
-			rewardValue = switch (quest.rewardType()) {
-				case XP -> Text.literal(quest.rewardAmount() + " XP");
-				case LEVEL -> Text.literal(quest.rewardAmount() + " ").append(Text.translatable("gui.pacpack-quests.levels"));
-				case ITEM -> Text.literal(quest.rewardAmount() + "x ").append(TranslationUtils.getTranslatedName(quest.reward(), RegistryType.ITEM));
-				case ENCHANTED_BOOK -> Text.literal(quest.rewardAmount() + "x ").append(TranslationUtils.getTranslatedName(quest.reward(), RegistryType.ENCHANTMENT));
-			};
-			rewardValue.formatted(Formatting.DARK_GRAY, Formatting.STRIKETHROUGH);
-		} else {
-			// If not claimed: apply the proper colors (Green for XP, Rarity for Items)
-			rewardValue = switch (quest.rewardType()) {
-				case XP -> Text.literal(quest.rewardAmount() + " XP").formatted(Formatting.GREEN);
-				case LEVEL -> Text.literal(quest.rewardAmount() + " ").append(Text.translatable("gui.pacpack-quests.levels")).formatted(Formatting.DARK_GREEN, Formatting.BOLD);
-				case ITEM -> Text.literal(quest.rewardAmount() + "x ").append(TranslationUtils.getTranslatedName(quest.reward(), RegistryType.ITEM)).formatted(Formatting.WHITE);
-				case ENCHANTED_BOOK -> Text.literal(quest.rewardAmount() + "x ").append(TranslationUtils.getTranslatedName(quest.reward(), RegistryType.ENCHANTMENT)).formatted(Formatting.LIGHT_PURPLE);
-			};
-		}
-
-		// Assemble the label (gray) and the value (colored)
-		tooltip.add(rewardLabel.append(rewardValue));
+		tooltip.add(rewardLabel.append(TranslationUtils.getRewardText(quest.rewardType(), quest.reward(), quest.rewardAmount(), claimed)));
 
 		context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
 	}

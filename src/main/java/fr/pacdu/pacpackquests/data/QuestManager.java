@@ -112,6 +112,10 @@ public class QuestManager {
             rewardType = RewardType.LEVEL;
         } else if (rewardStr.startsWith("enchanted_book:") || rewardStr.startsWith("minecraft:enchanted_book:")) {
             rewardType = RewardType.ENCHANTED_BOOK;
+        } else if (rewardStr.startsWith("#")) {
+            rewardType = RewardType.ITEM;
+            Identifier tagId = Identifier.tryParse(rewardStr.substring(1));
+            if (tagId == null) errorMessage.append(" The reward tag ").append(json.get("reward")).append(" is invalid,");
         } else {
             rewardType = RewardType.ITEM;
             Item rewardItem = Registries.ITEM.get(Identifier.of(rewardStr));

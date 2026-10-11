@@ -44,6 +44,7 @@ public class SelectionScreen extends Screen {
     private int rows;
     private int maxVisible;
     private boolean withTags = true;
+    private boolean isReward = true;
 
     public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected) {
         super(Text.translatable("gui.pacpack-quests.select_element"));
@@ -55,6 +56,11 @@ public class SelectionScreen extends Screen {
     public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, boolean withTags) {
         this(parent, contextType, onSelected);
         this.withTags = withTags;
+    }
+
+    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, boolean withTags, boolean isReward) {
+        this(parent, contextType, onSelected, withTags);
+        this.isReward = isReward;
     }
 
     @Override
@@ -269,7 +275,7 @@ public class SelectionScreen extends Screen {
         // Draw Tooltip on top of everything
         if (hoveredEntry != null) {
             List<Text> tooltip = new ArrayList<>();
-            tooltip.add(Text.literal(getTranslatedName(hoveredEntry, this.contextType)).formatted(Formatting.GOLD));
+            tooltip.add(Text.literal(getTranslatedName(hoveredEntry, this.contextType, this.isReward)).formatted(Formatting.GOLD));
             tooltip.add(Text.literal(hoveredEntry).formatted(Formatting.DARK_GRAY));
             context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
         }

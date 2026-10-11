@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 import static fr.pacdu.pacpackquests.client.util.TranslationUtils.getTranslatedName;
+import static fr.pacdu.pacpackquests.client.util.TranslationUtils.getTranslatedRewardName;
 
 public class EditQuestScreen extends Screen {
 
@@ -209,7 +210,7 @@ public class EditQuestScreen extends Screen {
             this.client.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedReward = result;
                 updateRewardButtonMessage();
-            }));
+            }, true, true));
         }).dimensions(col2, y, fieldWidth, 20).build();
         this.rewardButton.active = (currentRewardType == RewardType.ITEM || currentRewardType == RewardType.ENCHANTED_BOOK);
         updateRewardButtonMessage();
@@ -261,7 +262,7 @@ public class EditQuestScreen extends Screen {
     private void updateRewardButtonMessage() {
         if (this.rewardButton == null) return;
         RegistryType ctx = (currentRewardType == RewardType.ENCHANTED_BOOK) ? RegistryType.ENCHANTMENT : RegistryType.ITEM;
-        this.rewardButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(selectedReward, ctx))));
+        this.rewardButton.setMessage(Text.literal(formatDisplayString(getTranslatedRewardName(selectedReward, ctx))));
     }
 
     // Validity checks are mostly handled by the selection screen now, but we keep this as a safeguard

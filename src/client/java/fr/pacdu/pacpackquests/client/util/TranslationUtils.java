@@ -1,5 +1,6 @@
 package fr.pacdu.pacpackquests.client.util;
 
+import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.resource.language.I18n;
@@ -8,7 +9,9 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
 public class TranslationUtils {
@@ -16,11 +19,47 @@ public class TranslationUtils {
     private TranslationUtils() {}
 
     /**
+     * Formats the visual display text of a reward with appropriate styling and color.
+     */
+    public static Text getRewardText(RewardType type, String reward, int amount, boolean isClaimed) {
+        if (type == null) return Text.empty();
+
+        MutableText text = switch (type) {
+            case XP -> Text.literal(amount + " XP");
+            case LEVEL -> Text.literal(amount + " ").append(Text.translatable("gui.pacpack-quests.levels"));
+            case ITEM -> Text.literal(amount + "x ").append(getTranslatedRewardName(reward, RegistryType.ITEM));
+            case ENCHANTED_BOOK -> Text.literal(amount + "x ").append(getTranslatedRewardName(reward, RegistryType.ENCHANTMENT));
+        };
+
+        if (isClaimed) {
+            return text.formatted(Formatting.DARK_GRAY, Formatting.STRIKETHROUGH);
+        }
+
+        return switch (type) {
+            case XP -> text.formatted(Formatting.GREEN);
+            case LEVEL -> text.formatted(Formatting.DARK_GREEN, Formatting.BOLD);
+            case ITEM -> text.formatted(Formatting.WHITE);
+            case ENCHANTED_BOOK -> text.formatted(Formatting.LIGHT_PURPLE);
+        };
+    }
+
+    /**
      * Translate an id (e.g. "minecraft:stone", "#minecraft:logs", or an enchanted book) into a readable name.
      * @param entryId a valid ID or tag.
      * @param type the type of the ID corresponding to a Minecraft Registry.
      */
     public static String getTranslatedName(String entryId, RegistryType type) {
+        return getTranslatedName(entryId, type, false);
+    }
+
+    /**
+     * Translate an id specifically for a reward into a readable name (e.g. "Random Logs" instead of "Any Logs").
+     */
+    public static String getTranslatedRewardName(String entryId, RegistryType type) {
+        return getTranslatedName(entryId, type, true);
+    }
+
+    public static String getTranslatedName(String entryId, RegistryType type, boolean isReward) {
         if (entryId == null || entryId.isEmpty()) return "...";
 
         if (type == RegistryType.ENCHANTMENT || entryId.startsWith("enchanted_book:") || entryId.startsWith("minecraft:enchanted_book:")) {
@@ -35,7 +74,8 @@ public class TranslationUtils {
 
         if (isTag) {
             String path = id.getPath();
-            return "Any " + path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
+            String prefix = isReward ? "Random " : "Any ";
+            return prefix + path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
         }
 
         return switch (type) {
