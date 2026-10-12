@@ -1,8 +1,9 @@
-package fr.pacdu.pacpackquests.client;
+package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.SaveQuestPayload;
@@ -25,6 +26,7 @@ import net.minecraft.util.Identifier;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 import static fr.pacdu.pacpackquests.client.util.TranslationUtils.getTranslatedName;
 import static fr.pacdu.pacpackquests.client.util.TranslationUtils.getTranslatedRewardName;
@@ -41,9 +43,10 @@ public class EditQuestScreen extends Screen {
     private ButtonWidget parentsButton;
 
     // Custom Selection Buttons (Replaced the TextFields)
-    private ButtonWidget targetButton, iconButton, rewardButton, taskTypeButton;
+    private ButtonWidget targetButton, iconButton, rewardButton, taskTypeButton, rewardTypeButton;
 
     private boolean isTaskDropdownOpen = false;
+    private boolean isRewardDropdownOpen = false;
     private final ScrollbarWidget dropdownScrollbar = new ScrollbarWidget(0, 0, 6, 0, 1, true);
     private static final int MAX_DROPDOWN_VISIBLE = 4;
 
@@ -164,27 +167,16 @@ public class EditQuestScreen extends Screen {
         // ROW 3: Task Type & Reward Type Toggles
         y += yStep - 10;
         this.taskTypeButton = ButtonWidget.builder(
-                Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + I18n.translate("task.pacpack-quests." + currentTaskType.name().toLowerCase())),
+                Text.translatable("form.pacpack-quests.task_type").append(Text.literal(": ")).append(Text.translatable("task.pacpack-quests." + currentTaskType.name().toLowerCase())),
                 button -> this.isTaskDropdownOpen = !this.isTaskDropdownOpen
         ).dimensions(col1, y, fieldWidth, 20).build();
         this.addDrawableChild(this.taskTypeButton);
 
-        this.addDrawableChild(ButtonWidget.builder(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + I18n.translate("reward.pacpack-quests." + currentRewardType.name().toLowerCase())), button -> {
-            int nextOrdinal = (currentRewardType.ordinal() + 1) % RewardType.values().length;
-            currentRewardType = RewardType.values()[nextOrdinal];
-            button.setMessage(Text.literal(I18n.translate("form.pacpack-quests.reward_type") + ": " + I18n.translate("reward.pacpack-quests." + currentRewardType.name().toLowerCase())));
-            this.rewardButton.active = (currentRewardType == RewardType.ITEM || currentRewardType == RewardType.ENCHANTED_BOOK);
-            switch (currentRewardType) {
-                case ITEM, LEVEL, ENCHANTED_BOOK -> this.rewardAmountField.setText("1");
-                case XP -> this.rewardAmountField.setText("100");
-            }
-            if (currentRewardType == RewardType.ENCHANTED_BOOK && (this.selectedReward == null || !this.selectedReward.startsWith("enchanted_book:"))) {
-                this.selectedReward = "enchanted_book:minecraft:protection:1";
-            } else if (currentRewardType == RewardType.ITEM && (this.selectedReward == null || this.selectedReward.startsWith("enchanted_book:"))) {
-                this.selectedReward = "minecraft:diamond";
-            }
-            updateRewardButtonMessage();
-        }).dimensions(col2, y, fieldWidth, 20).build());
+        this.rewardTypeButton = ButtonWidget.builder(
+                Text.translatable("form.pacpack-quests.reward_type").append(Text.literal(": ")).append(Text.translatable("reward.pacpack-quests." + currentRewardType.name().toLowerCase())),
+                button -> this.isRewardDropdownOpen = !this.isRewardDropdownOpen
+        ).dimensions(col2, y, fieldWidth, 20).build();
+        this.addDrawableChild(this.rewardTypeButton);
 
         // ROW 4: Target Button & Reward Button
         y += yStep;
@@ -399,72 +391,101 @@ public class EditQuestScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (this.isTaskDropdownOpen && dropdownScrollbar.mouseScrolled(mouseX, mouseY, verticalAmount)) return true;
+        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseScrolled(mouseX, mouseY, verticalAmount)) return true;
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override
     public boolean mouseDragged(Click click, double offsetX, double offsetY) {
-        if (this.isTaskDropdownOpen && dropdownScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) return true;
+        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseDragged(click.x(), click.y(), click.button(), offsetX, offsetY)) return true;
         return super.mouseDragged(click, offsetX, offsetY);
     }
 
     @Override
     public boolean mouseReleased(Click click) {
-        if (this.isTaskDropdownOpen && dropdownScrollbar.mouseReleased(click.x(), click.y(), click.button())) return true;
+        if ((this.isTaskDropdownOpen || this.isRewardDropdownOpen) && dropdownScrollbar.mouseReleased(click.x(), click.y(), click.button())) return true;
         return super.mouseReleased(click);
     }
-
-
 
     @Override
     public boolean mouseClicked(Click click, boolean doubled) {
         if (this.isTaskDropdownOpen && this.taskTypeButton != null) {
-            int dropX = this.taskTypeButton.getX();
-            int dropY = this.taskTypeButton.getY() + this.taskTypeButton.getHeight();
-            int dropWidth = this.taskTypeButton.getWidth();
-            
-            int numOptions = TaskType.values().length;
-            int visibleOptions = Math.min(numOptions, MAX_DROPDOWN_VISIBLE);
-            int dropHeight = 20 * visibleOptions;
-
-            if (dropdownScrollbar.mouseClicked(click.x(), click.y(), click.button())) {
+            if (handleDropdownClick(click, this.taskTypeButton, TaskType.values(), this::selectTaskType, () -> this.isTaskDropdownOpen = false)) {
                 return true;
             }
+        }
 
-            if (click.x() >= dropX && click.x() < dropX + dropWidth && click.y() >= dropY && click.y() < dropY + dropHeight) {
-                int taskDropdownScroll = dropdownScrollbar.getStepOffset();
-                int index = (int) ((taskDropdownScroll + click.y() - dropY) / 20);
-                if (index >= 0 && index < numOptions) {
-                    this.currentTaskType = TaskType.values()[index];
-                    this.taskTypeButton.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + I18n.translate("task.pacpack-quests." + this.currentTaskType.name().toLowerCase())));
-                    this.isTaskDropdownOpen = false;
-                    this.reqAmountField.setEditable(this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME);
-
-                    if (this.currentTaskType == TaskType.EXPLORE_DIMENSION || this.currentTaskType == TaskType.EXPLORE_BIOME) {
-                        this.reqAmountField.setText("1");
-                    }
-
-                    this.selectedTarget = switch (this.currentTaskType) {
-                        case MINE_BLOCK -> "minecraft:stone";
-                        case KILL_MOB -> "minecraft:zombie";
-                        case CRAFT_ITEM, OBTAIN_ITEM -> "minecraft:iron_pickaxe";
-                        case EXPLORE_BIOME -> "minecraft:desert";
-                        case EXPLORE_STRUCTURE -> "minecraft:ruined_portal";
-                        case EXPLORE_DIMENSION -> "minecraft:the_nether";
-                        case OPEN_LOOT_CHEST -> "#pacpackquests:loot_chests";
-                    };
-
-                    this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(selectedTarget, RegistryType.ITEM))));
-
-                    return true;
-                }
-            } else if (!this.taskTypeButton.isMouseOver(click.x(), click.y())) {
-                this.isTaskDropdownOpen = false;
+        if (this.isRewardDropdownOpen && this.rewardTypeButton != null) {
+            if (handleDropdownClick(click, this.rewardTypeButton, RewardType.values(), this::selectRewardType, () -> this.isRewardDropdownOpen = false)) {
+                return true;
             }
+        }
+
+        return super.mouseClicked(click, doubled);
+    }
+
+    private <E extends Enum<E>> boolean handleDropdownClick(Click click, ButtonWidget button, E[] values, Consumer<E> onSelect, Runnable closeDropdown) {
+        int dropX = button.getX();
+        int dropY = button.getY() + button.getHeight();
+        int dropWidth = button.getWidth();
+
+        int numOptions = values.length;
+        int visibleOptions = Math.min(numOptions, MAX_DROPDOWN_VISIBLE);
+        int dropHeight = 20 * visibleOptions;
+
+        if (this.dropdownScrollbar.mouseClicked(click.x(), click.y(), click.button())) {
             return true;
         }
-        return super.mouseClicked(click, doubled);
+
+        if (click.x() >= dropX && click.x() < dropX + dropWidth && click.y() >= dropY && click.y() < dropY + dropHeight) {
+            int taskDropdownScroll = this.dropdownScrollbar.getStepOffset();
+            int index = (int) ((taskDropdownScroll + click.y() - dropY) / 20);
+            if (index >= 0 && index < numOptions) {
+                onSelect.accept(values[index]);
+                closeDropdown.run();
+                return true;
+            }
+        } else if (!button.isMouseOver(click.x(), click.y())) {
+            closeDropdown.run();
+        }
+
+        return false;
+    }
+
+    private void selectTaskType(TaskType type) {
+        this.currentTaskType = type;
+        this.taskTypeButton.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + I18n.translate("task.pacpack-quests." + type.name().toLowerCase())));
+        this.reqAmountField.setEditable(type != TaskType.EXPLORE_DIMENSION && type != TaskType.EXPLORE_BIOME);
+
+        if (type == TaskType.EXPLORE_DIMENSION || type == TaskType.EXPLORE_BIOME) {
+            this.reqAmountField.setText("1");
+        }
+
+        this.selectedTarget = switch (type) {
+            case MINE_BLOCK -> "minecraft:stone";
+            case KILL_MOB -> "minecraft:zombie";
+            case CRAFT_ITEM, OBTAIN_ITEM -> "minecraft:iron_pickaxe";
+            case EXPLORE_BIOME -> "minecraft:desert";
+            case EXPLORE_STRUCTURE -> "minecraft:ruined_portal";
+            case EXPLORE_DIMENSION -> "minecraft:the_nether";
+            case OPEN_LOOT_CHEST -> "#pacpackquests:loot_chests";
+        };
+
+        this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(this.selectedTarget, RegistryType.ITEM))));
+    }
+
+    private void selectRewardType(RewardType type) {
+        this.currentRewardType = type;
+        this.rewardTypeButton.setMessage(Text.translatable("form.pacpack-quests.reward_type").append(Text.literal(": ")).append(Text.translatable("reward.pacpack-quests." + type.name().toLowerCase())));
+        this.rewardButton.active = (type != RewardType.XP && type != RewardType.LEVEL);
+
+        this.selectedReward = switch (type) {
+            case ITEM -> "minecraft:diamond";
+            case ENCHANTED_BOOK -> "enchanted_book:minecraft:protection:1";
+            default -> this.selectedReward;
+        };
+
+        updateRewardButtonMessage();
     }
 
     @Override
@@ -490,49 +511,56 @@ public class EditQuestScreen extends Screen {
 
         // Draw TaskType dropdown menu on top
         if (this.isTaskDropdownOpen && this.taskTypeButton != null) {
-            int dropX = this.taskTypeButton.getX();
-            int dropY = this.taskTypeButton.getY() + this.taskTypeButton.getHeight();
-            int dropWidth = this.taskTypeButton.getWidth();
-            int numOptions = TaskType.values().length;
-            
-            int visibleOptions = Math.min(numOptions, MAX_DROPDOWN_VISIBLE);
-            int dropHeight = 20 * visibleOptions;
-            int maxScroll = Math.max(0, (numOptions * 20) - dropHeight);
+            drawDropdownMenu(context, mouseX, mouseY, this.taskTypeButton, TaskType.values(), "task");
+        }
 
-            // overall background
-            context.fill(dropX, dropY, dropX + dropWidth, dropY + dropHeight, 0xFF000000);
-            
-            // outline
-            int totalWidth = maxScroll > 0 ? dropWidth + 6 : dropWidth;
-            context.fill(dropX - 1, dropY - 1, dropX + totalWidth + 1, dropY, 0xFFAAAAAA);
-            context.fill(dropX - 1, dropY + dropHeight, dropX + totalWidth + 1, dropY + dropHeight + 1, 0xFFAAAAAA);
-            context.fill(dropX - 1, dropY, dropX, dropY + dropHeight, 0xFFAAAAAA);
-            context.fill(dropX + totalWidth, dropY, dropX + totalWidth + 1, dropY + dropHeight, 0xFFAAAAAA);
+        if (this.isRewardDropdownOpen && this.rewardTypeButton != null) {
+            drawDropdownMenu(context, mouseX, mouseY, this.rewardTypeButton, RewardType.values(), "reward");
+        }
+    }
 
-            context.enableScissor(dropX, dropY, dropX + dropWidth, dropY + dropHeight);
-            context.getMatrices().translate(0f, (float) -dropdownScrollbar.getScrollAmount());
+    private <E extends Enum<E>>  void drawDropdownMenu(DrawContext context, int mouseX, int mouseY, ButtonWidget button, E[] values, String type) {
+        int dropX = button.getX();
+        int dropY = button.getY() + button.getHeight();
+        int dropWidth = button.getWidth();
+        int numOptions = values.length;
 
-            for (int i = 0; i < numOptions; i++) {
-                int optY = dropY + (i * 20);
-                boolean hovered = mouseX >= dropX && mouseX < dropX + dropWidth && mouseY >= dropY && mouseY < dropY + dropHeight && 
-                                  (mouseY + dropdownScrollbar.getScrollAmount()) >= optY && (mouseY + dropdownScrollbar.getScrollAmount()) < optY + 20;
-                
-                if (hovered) {
-                    context.fill(dropX, optY, dropX + dropWidth, optY + 20, 0xFF666666);
-                }
-                context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(I18n.translate("task.pacpack-quests." + TaskType.values()[i].name().toLowerCase())), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
+        int visibleOptions = Math.min(numOptions, MAX_DROPDOWN_VISIBLE);
+        int dropHeight = 20 * visibleOptions;
+        int maxScroll = Math.max(0, (numOptions * 20) - dropHeight);
+
+        // overall background
+        context.fill(dropX, dropY, dropX + dropWidth, dropY + dropHeight, 0xFF000000);
+
+        // outline
+        int totalWidth = maxScroll > 0 ? dropWidth + 6 : dropWidth;
+        context.fill(dropX - 1, dropY - 1, dropX + totalWidth + 1, dropY, 0xFFAAAAAA);
+        context.fill(dropX - 1, dropY + dropHeight, dropX + totalWidth + 1, dropY + dropHeight + 1, 0xFFAAAAAA);
+        context.fill(dropX - 1, dropY, dropX, dropY + dropHeight, 0xFFAAAAAA);
+        context.fill(dropX + totalWidth, dropY, dropX + totalWidth + 1, dropY + dropHeight, 0xFFAAAAAA);
+
+        context.enableScissor(dropX, dropY, dropX + dropWidth, dropY + dropHeight);
+        context.getMatrices().translate(0f, (float) -this.dropdownScrollbar.getScrollAmount());
+
+        for (int i = 0; i < numOptions; i++) {
+            int optY = dropY + (i * 20);
+            boolean hovered = mouseX >= dropX && mouseX < dropX + dropWidth && mouseY >= dropY && mouseY < dropY + dropHeight &&
+                    (mouseY + this.dropdownScrollbar.getScrollAmount()) >= optY && (mouseY + this.dropdownScrollbar.getScrollAmount()) < optY + 20;
+
+            if (hovered) {
+                context.fill(dropX, optY, dropX + dropWidth, optY + 20, 0xFF666666);
             }
+            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(type + ".pacpack-quests." + values[i].name().toLowerCase()), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
+        }
 
-            context.getMatrices().translate(0f, (float) dropdownScrollbar.getScrollAmount());
-            context.disableScissor();
+        context.getMatrices().translate(0f, (float) this.dropdownScrollbar.getScrollAmount());
+        context.disableScissor();
 
-            // Draw scrollbar if needed
-            if (maxScroll > 0) {
-                dropdownScrollbar.setBounds(dropX + dropWidth, dropY, 6, dropHeight);
-                dropdownScrollbar.setMaxScroll(maxScroll, dropHeight);
-                dropdownScrollbar.render(context, mouseX, mouseY);
-            }
-        
+        this.dropdownScrollbar.setBounds(dropX + dropWidth, dropY, 6, dropHeight);
+        this.dropdownScrollbar.setMaxScroll(maxScroll, dropHeight);
+        // Draw scrollbar if needed
+        if (maxScroll > 0) {
+            this.dropdownScrollbar.render(context, mouseX, mouseY);
         }
     }
 }

@@ -1,4 +1,4 @@
-package fr.pacdu.pacpackquests.client;
+package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;

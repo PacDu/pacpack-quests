@@ -1,4 +1,4 @@
-package fr.pacdu.pacpackquests.client;
+package fr.pacdu.pacpackquests.client.screen;
 
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;

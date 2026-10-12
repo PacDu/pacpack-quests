@@ -1,6 +1,8 @@
 package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.client.screen.QuestScreen;
+import fr.pacdu.pacpackquests.client.screen.SelectionScreen;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.*;
 import fr.pacdu.pacpackquests.util.RegistryType;
