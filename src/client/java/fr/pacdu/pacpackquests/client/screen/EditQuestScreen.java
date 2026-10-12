@@ -12,6 +12,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.cursor.StandardCursors;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
@@ -539,6 +540,11 @@ public class EditQuestScreen extends Screen {
         context.fill(dropX - 1, dropY, dropX, dropY + dropHeight, 0xFFAAAAAA);
         context.fill(dropX + totalWidth, dropY, dropX + totalWidth + 1, dropY + dropHeight, 0xFFAAAAAA);
 
+        boolean mouseInDropdown = mouseX >= dropX && mouseX <= dropX + totalWidth && mouseY >= dropY && mouseY <= dropY + dropHeight;
+        if (mouseInDropdown) {
+            context.setCursor(StandardCursors.ARROW);
+        }
+
         context.enableScissor(dropX, dropY, dropX + dropWidth, dropY + dropHeight);
         context.getMatrices().translate(0f, (float) -this.dropdownScrollbar.getScrollAmount());
 
@@ -549,6 +555,7 @@ public class EditQuestScreen extends Screen {
 
             if (hovered) {
                 context.fill(dropX, optY, dropX + dropWidth, optY + 20, 0xFF666666);
+                context.setCursor(StandardCursors.POINTING_HAND);
             }
             context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable(type + ".pacpack-quests." + values[i].name().toLowerCase()), dropX + dropWidth / 2, optY + 6, 0xFFFFFFFF);
         }
