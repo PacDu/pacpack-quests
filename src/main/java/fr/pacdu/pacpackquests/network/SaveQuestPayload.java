@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public record SaveQuestPayload(
-        String questId, String title, String category, TaskType type, String target,
+        String questId, String title, String category, TaskType taskType, String target,
         int requiredAmount, String iconId, String reward, RewardType rewardType,
         int rewardAmount, List<String> parents, int displayX, int displayY
 ) implements CustomPayload {
@@ -24,7 +24,7 @@ public record SaveQuestPayload(
                 buf.writeString(value.questId());
                 buf.writeString(value.title());
                 buf.writeString(value.category());
-                buf.writeEnumConstant(value.type());
+                buf.writeEnumConstant(value.taskType());
                 buf.writeString(value.target());
                 buf.writeInt(value.requiredAmount());
                 buf.writeString(value.iconId());

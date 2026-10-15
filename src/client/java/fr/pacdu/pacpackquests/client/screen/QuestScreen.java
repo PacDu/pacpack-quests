@@ -134,7 +134,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 				questList.add(new QuestNode(
 						quest.id(), quest.title(), quest.displayX(), quest.displayY(), localX, localY,
-						quest.type(), quest.target(), quest.icon(), quest.reward(),
+						quest.taskType(), quest.target(), quest.icon(), quest.reward(),
 						quest.rewardType(), quest.rewardAmount(), quest.parents(), locked
 				));
 			}
@@ -653,7 +653,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 					QuestDefinition newDef = new QuestDefinition(
 							oldDef.id(), oldDef.title(), oldDef.category(),
-							oldDef.type(), oldDef.target(), oldDef.requiredAmount(),
+							oldDef.taskType(), oldDef.target(), oldDef.requiredAmount(),
 							oldDef.icon(), oldDef.reward(), oldDef.rewardType(),
 							oldDef.rewardAmount(), oldDef.parents(),
 							finalX, finalY

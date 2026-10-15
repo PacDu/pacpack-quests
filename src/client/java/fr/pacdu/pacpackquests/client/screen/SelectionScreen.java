@@ -402,9 +402,7 @@ public class SelectionScreen extends Screen {
                 }
                 yield -1;
             }
-            case DIMENSION -> -1; // Dimensions do not have standard numeric IDs; they will be listed in alphabetical order
-            case LOOT_TABLE -> -1;
-            case ENCHANTMENT -> -1;
+            case DIMENSION, LOOT_TABLE, ENCHANTMENT, COMMAND -> -1; // Those do not have standard numeric IDs; they will be listed in alphabetical order
         };
     }
 }

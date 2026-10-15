@@ -1,6 +1,7 @@
 package fr.pacdu.pacpackquests.network;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
@@ -26,7 +27,7 @@ import java.util.UUID;
 
 public class ServerNetworkHandler {
 
-    private static final Gson GSON = new Gson();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private ServerNetworkHandler() {}
 
@@ -69,7 +70,7 @@ public class ServerNetworkHandler {
 
                     QuestDefinition newDef = new QuestDefinition(
                             quest.id(), quest.title(), quest.category(),
-                            quest.type(), quest.target(), quest.requiredAmount(),
+                            quest.taskType(), quest.target(), quest.requiredAmount(),
                             quest.icon(), quest.reward(), quest.rewardType(),
                             quest.rewardAmount(), quest.parents(),
                             payload.newX(), payload.newY()
@@ -77,7 +78,7 @@ public class ServerNetworkHandler {
                     QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
 
                     QuestSyncPayload syncPacket = new QuestSyncPayload(
-                            newDef.id(), newDef.title(), newDef.category(), newDef.type(),
+                            newDef.id(), newDef.title(), newDef.category(), newDef.taskType(),
                             newDef.target(), newDef.requiredAmount(),
                             Registries.ITEM.getId(newDef.icon().getItem()).toString(),
                             newDef.reward(),
@@ -105,15 +106,16 @@ public class ServerNetworkHandler {
 
             JsonObject json = new JsonObject();
             json.addProperty("title", payload.title());
-            json.addProperty("type", payload.type().toString());
+            json.addProperty("taskType", payload.taskType().toString());
             json.addProperty("target", payload.target());
             json.addProperty("requiredAmount", payload.requiredAmount());
             json.addProperty("icon", payload.iconId());
+            json.addProperty("rewardType", payload.rewardType().toString());
 
             switch (payload.rewardType()) {
                 case XP -> json.addProperty("reward", "xp");
                 case LEVEL -> json.addProperty("reward", "level");
-                case ITEM, ENCHANTED_BOOK -> json.addProperty("reward", payload.reward());
+                case ITEM, ENCHANTED_BOOK, COMMAND -> json.addProperty("reward", payload.reward());
             }
             json.addProperty("rewardAmount", payload.rewardAmount());
 
@@ -128,7 +130,7 @@ public class ServerNetworkHandler {
                 Files.writeString(questFile, GSON.toJson(json));
 
                 QuestDefinition newDef = new QuestDefinition(
-                        payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
+                        payload.questId(), payload.title(), payload.category(), payload.taskType(), payload.target(),
                         payload.requiredAmount(), new ItemStack(Registries.ITEM.get(Identifier.of(payload.iconId()))),
                         payload.reward(), payload.rewardType(),
                         payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
@@ -136,7 +138,7 @@ public class ServerNetworkHandler {
                 QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
 
                 QuestSyncPayload syncPacket = new QuestSyncPayload(
-                        payload.questId(), payload.title(), payload.category(), payload.type(),
+                        payload.questId(), payload.title(), payload.category(), payload.taskType(),
                         payload.target(), payload.requiredAmount(), payload.iconId(), payload.reward(),
                         payload.rewardType(), payload.rewardAmount(), payload.parents(),
                         payload.displayX(), payload.displayY()
@@ -271,7 +273,7 @@ public class ServerNetworkHandler {
                 }
                 for (QuestDefinition quest : questsToUpdate) {
                     QuestDefinition updatedQuest = new QuestDefinition(quest.id(), quest.title(), categoryNew,
-                            quest.type(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
+                            quest.taskType(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
                             quest.rewardType(), quest.rewardAmount(), quest.parents(), quest.displayX(), quest.displayY());
                     QuestManager.LOADED_QUESTS.put(quest.id(), updatedQuest);
                 }

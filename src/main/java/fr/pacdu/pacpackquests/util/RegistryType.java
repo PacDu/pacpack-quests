@@ -1,7 +1,7 @@
 package fr.pacdu.pacpackquests.util;
 
 /**
- * Defines the type of game element we are looking for in the registries.
+ * Defines the taskType of game element we are looking for in the registries.
  */
 public enum RegistryType {
     ITEM,
@@ -11,5 +11,6 @@ public enum RegistryType {
     STRUCTURE,
     DIMENSION,
     LOOT_TABLE,
-    ENCHANTMENT
+    ENCHANTMENT,
+    COMMAND
 }

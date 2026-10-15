@@ -70,7 +70,7 @@ public class PacPackQuests implements ModInitializer {
 						quest.id(),
 						quest.title(),
 						quest.category(),
-						quest.type(),
+						quest.taskType(),
 						quest.target(),
 						quest.requiredAmount(),
 						Registries.ITEM.getId(quest.icon().getItem()).toString(),

@@ -36,7 +36,7 @@ public class CraftingResultSlotMixin {
             if (stack.isEmpty()) return;
 
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                if (quest.type() == TaskType.CRAFT_ITEM) {
+                if (quest.taskType() == TaskType.CRAFT_ITEM) {
                     String target = quest.target().trim();
                     boolean isTarget;
 

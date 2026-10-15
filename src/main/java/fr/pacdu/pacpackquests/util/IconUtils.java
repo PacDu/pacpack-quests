@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class IconUtils {
 
     // CACHE: Stores the result of the heavy search so we only compute it ONCE per unique target.
-    // The key is a combination of target and type (e.g., "minecraft:zombie_MOB") to prevent collisions.
+    // The key is a combination of target and taskType (e.g., "minecraft:zombie_MOB") to prevent collisions.
     private static final Map<String, Item> ICON_CACHE = new HashMap<>();
 
     /**
@@ -83,7 +83,7 @@ public class IconUtils {
             if (heuristic != null) return heuristic;
         }
 
-        // Filter out more generic tag words like "type", "is", "primary"
+        // Filter out more generic tag words like "taskType", "is", "primary"
         Set<String> keywords = Arrays.stream(path.split("[_/]"))
                 .filter(w -> w.length() > 3)
                 .filter(w -> !w.equals("biome") && !w.equals("structure") && !w.equals("dimension") && !w.equals("city"))

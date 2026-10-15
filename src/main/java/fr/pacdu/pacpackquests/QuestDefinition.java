@@ -8,7 +8,7 @@ import java.util.List;
  * This record holds all defining properties of a quest such as its objectives, rewards, and display settings.
  */
 public record QuestDefinition(
-        String id, String title, String category, TaskType type, String target,
+        String id, String title, String category, TaskType taskType, String target,
         int requiredAmount, ItemStack icon, String reward, RewardType rewardType,
         int rewardAmount, List<String> parents, int displayX, int displayY
 ) {}

@@ -40,7 +40,7 @@ public class QuestEventHandler {
         PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
             if (!world.isClient()) {
                 for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                    if (quest.type() == TaskType.MINE_BLOCK) {
+                    if (quest.taskType() == TaskType.MINE_BLOCK) {
                         boolean isTarget;
                         String target = quest.target();
 
@@ -63,7 +63,7 @@ public class QuestEventHandler {
         ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity, damageSource) -> {
             if (entity instanceof ServerPlayerEntity player) {
                 for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                    if (quest.type() == TaskType.KILL_MOB) {
+                    if (quest.taskType() == TaskType.KILL_MOB) {
                         boolean isTarget;
                         String target = quest.target();
 
@@ -143,7 +143,7 @@ public class QuestEventHandler {
 
                     if (targetId == null) continue;
 
-                    switch (quest.type()) {
+                    switch (quest.taskType()) {
                         case OBTAIN_ITEM -> {
                             if (!gainedItems.isEmpty()) {
                                 int gained = 0;
@@ -214,7 +214,7 @@ public class QuestEventHandler {
         if (lootKey != null) {
             Identifier lootTableId = lootKey.getValue();
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
-                if (quest.type() == TaskType.OPEN_LOOT_CHEST) {
+                if (quest.taskType() == TaskType.OPEN_LOOT_CHEST) {
                     String target = quest.target();
                     if (checkLootrStatus((ServerPlayerEntity) player, entity, isEntity) && (target.equals("#pacpackquests:loot_chest") || target.equals(lootTableId.toString()))) {
                         QuestProgressHandler.incrementProgress((ServerPlayerEntity) player, quest, 1);

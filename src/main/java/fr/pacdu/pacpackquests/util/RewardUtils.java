@@ -1,5 +1,6 @@
 package fr.pacdu.pacpackquests.util;
 
+import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.data.RewardEntry;
@@ -14,7 +15,10 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 import java.util.List;
@@ -42,6 +46,7 @@ public class RewardUtils {
                 Identifier id = Identifier.tryParse(rewardId);
                 yield id != null && Registries.ITEM.containsId(id) ? new ItemStack(Registries.ITEM.get(id)) : ItemStack.EMPTY;
             }
+            case COMMAND -> new ItemStack(Items.WRITABLE_BOOK);
         };
     }
 
@@ -100,7 +105,7 @@ public class RewardUtils {
     }
 
     /**
-     * Grants a specific reward type, target, and amount to a server player.
+     * Grants a specific reward taskType, target, and amount to a server player.
      * Supports:
      * - XP points
      * - Experience levels
@@ -144,6 +149,37 @@ public class RewardUtils {
                 Identifier id = Identifier.tryParse(target);
                 if (id != null && Registries.ITEM.containsId(id)) {
                     giveItemStack(player, new ItemStack(Registries.ITEM.get(id), amount));
+                }
+            }
+
+            case COMMAND -> {
+                if (target == null || target.isEmpty()) return;
+
+                // 1. Get the server (or use context.server() if inside a packet receiver)
+                MinecraftServer server = player.getCommandSource().getServer();
+
+                // 2. Remove the leading "/" if present (Brigadier does not want the slash)
+                String cleanCommand = target.startsWith("/")
+                        ? target.substring(1)
+                        : target;
+
+                // 3. Use the server's command source (already has OP permissions by default)
+                // and anchor it to the player's entity position, rotation and dimension
+                ServerCommandSource source = server.getCommandSource()
+                        .withEntity(player)
+                        .withPosition(player.getEntityPos())
+                        .withRotation(player.getRotationClient())
+                        .withWorld(player.getEntityWorld())
+                        .withSilent();
+
+                // 4. Execute directly via Brigadier's dispatcher (version-independent API)
+                try {
+                    for (int i = 0; i < amount; i++) {
+                        server.getCommandManager().getDispatcher().execute(cleanCommand, source);
+                    }
+                } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+                    // Log an error if the modpack creator wrote an invalid command in the quest
+                    PacPackQuests.LOGGER.error("Failed to execute quest reward command: " + cleanCommand, e);
                 }
             }
         }

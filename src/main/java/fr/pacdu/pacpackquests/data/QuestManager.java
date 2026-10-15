@@ -1,9 +1,6 @@
 package fr.pacdu.pacpackquests.data;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
@@ -15,6 +12,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.Identifier;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -28,8 +26,8 @@ import java.io.InputStreamReader;
 public class QuestManager {
 
     public static final Map<String, QuestDefinition> LOADED_QUESTS = new HashMap<>();
-    private static final Gson GSON = new Gson();
-    private static final List<String> QUEST_DEFINITION_REQUIDED_LIST = Arrays.asList("title", "type", "target", "requiredAmount", "icon", "reward", "rewardAmount", "displayX",  "displayY");
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final List<String> QUEST_DEFINITION_REQUIDED_LIST = Arrays.asList("title", "taskType", "target", "requiredAmount", "icon", "rewardType", "reward", "rewardAmount", "displayX",  "displayY");
 
     public static void loadQuests(MinecraftServer server) {
         loadQuests();
@@ -76,9 +74,12 @@ public class QuestManager {
 
         StringBuilder errorMessage = new StringBuilder();
 
+        String errors = parseAndProcessDeprecatedFields(filePath, json);
+        if (!errorMessage.isEmpty()) errorMessage.append(errors);
+
         for (String e : QUEST_DEFINITION_REQUIDED_LIST) {
             if (!json.has(e)) {
-                errorMessage.append("WARN : Variable \"").append(e).append("\" is missing in the quest ").append(questId).append(".");
+                errorMessage.append("Variable \"").append(e).append("\" is missing in the quest ").append(questId).append(".");
                 PacPackQuests.LOGGER.warn(errorMessage.toString());
                 return;
             }
@@ -90,8 +91,8 @@ public class QuestManager {
         if (lastSlash == -1) errorMessage.append(" The quest must be in a category (a subfolder),");
         String category = lastSlash == -1 ? "error" : filePath.substring(0, lastSlash);
 
-        TaskType type = TaskType.isValid(json.get("type").getAsString()) ? TaskType.valueOf(json.get("type").getAsString()) : null;
-        if (type == null) errorMessage.append(" The type \"").append(json.get("type")).append("\" does not exist,");
+        TaskType taskType = TaskType.isValid(json.get("taskType").getAsString()) ? TaskType.valueOf(json.get("taskType").getAsString()) : null;
+        if (taskType == null) errorMessage.append(" The taskType \"").append(json.get("taskType").getAsString()).append("\" does not exist,");
 
         String target = json.get("target").getAsString();
         if (Identifier.tryParse(target) == null && Identifier.tryParse(target.substring(1)) == null) errorMessage.append(" The target ").append(json.get("target")).append(" is not a valid target,");
@@ -104,20 +105,13 @@ public class QuestManager {
 
         String rewardStr = json.get("reward").getAsString();
 
-        RewardType rewardType;
+        RewardType rewardType = RewardType.isValid(json.get("rewardType").getAsString()) ? RewardType.valueOf(json.get("rewardType").getAsString()) : null;
+        if (rewardType == null) errorMessage.append(" The reward taskType \"").append(json.get("rewardType")).append("\" does not exist,");
 
-        if (rewardStr.equalsIgnoreCase("xp")) {
-            rewardType = RewardType.XP;
-        } else if (rewardStr.equalsIgnoreCase("level") || rewardStr.equalsIgnoreCase("levels")) {
-            rewardType = RewardType.LEVEL;
-        } else if (rewardStr.startsWith("enchanted_book:") || rewardStr.startsWith("minecraft:enchanted_book:")) {
-            rewardType = RewardType.ENCHANTED_BOOK;
-        } else if (rewardStr.startsWith("#")) {
-            rewardType = RewardType.ITEM;
+        if (rewardStr.startsWith("#")) {
             Identifier tagId = Identifier.tryParse(rewardStr.substring(1));
             if (tagId == null) errorMessage.append(" The reward tag ").append(json.get("reward")).append(" is invalid,");
-        } else {
-            rewardType = RewardType.ITEM;
+        } else if (rewardStr.contains(":") && !rewardStr.contains(" ") && !rewardStr.startsWith("enchanted_book:") && !rewardStr.startsWith("minecraft:enchanted_book:")) {
             Item rewardItem = Registries.ITEM.get(Identifier.of(rewardStr));
             if (Objects.equals(rewardItem.toString(), "minecraft:air")) errorMessage.append(" The reward ").append(json.get("reward")).append(" does not exist,");
         }
@@ -147,10 +141,54 @@ public class QuestManager {
         }
 
         QuestDefinition quest = new QuestDefinition(
-                questId, title, category, type, target, requiredAmount, new ItemStack(iconItem),
+                questId, title, category, taskType, target, requiredAmount, new ItemStack(iconItem),
                 rewardStr, rewardType, rewardAmount, parents, displayX, displayY
         );
 
         LOADED_QUESTS.put(questId, quest);
+    }
+
+    private static String parseAndProcessDeprecatedFields(String filePath, JsonObject json) {
+        boolean needSave = false;
+        StringBuilder errorMessage = new StringBuilder();
+
+        if (json.has("type")) {
+            json.addProperty("taskType", json.get("type").getAsString());
+            json.remove("type");
+            needSave = true;
+            PacPackQuests.LOGGER.warn("Deprecated use of the field \"type\", use \"taskType\" instead.");
+        }
+
+        if (json.has("reward") && !json.has("rewardType")) {
+            String rewardStr = json.get("reward").getAsString();
+            RewardType rewardType;
+
+            if (rewardStr.equalsIgnoreCase("xp")) {
+                rewardType = RewardType.XP;
+            } else if (rewardStr.equalsIgnoreCase("level") || rewardStr.equalsIgnoreCase("levels")) {
+                rewardType = RewardType.LEVEL;
+            } else if (rewardStr.startsWith("enchanted_book:") || rewardStr.startsWith("minecraft:enchanted_book:")) {
+                rewardType = RewardType.ENCHANTED_BOOK;
+            } else if (rewardStr.startsWith("#") || (rewardStr.contains(":") && !rewardStr.contains(" "))) {
+                rewardType = RewardType.ITEM;
+            } else {
+                errorMessage.append(" The reward \"").append(json.get("reward")).append("\" is invalid,");
+                return errorMessage.toString();
+            }
+
+            json.addProperty("rewardType", rewardType.name());
+            needSave = true;
+        }
+
+        if (needSave) {
+            Path completePath = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + filePath);
+            try {
+                Files.writeString(completePath, GSON.toJson(json));
+            } catch (IOException e) {
+                PacPackQuests.LOGGER.error("Failed to save quest", e);
+            }
+        }
+
+        return errorMessage.toString();
     }
 }

@@ -104,7 +104,7 @@ public class ClientNetworkHandler {
             for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
                 if (quest.category().equals(payload.categoryOld())) {
                     QuestDefinition updatedQuest = new QuestDefinition(quest.id(), quest.title(), payload.categoryNew(),
-                            quest.type(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
+                            quest.taskType(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
                             quest.rewardType(), quest.rewardAmount(), quest.parents(), quest.displayX(), quest.displayY());
                     PacPackQuestsClient.CLIENT_DEFINITIONS.put(quest.id(), updatedQuest);
                 }

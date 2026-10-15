@@ -29,6 +29,7 @@ public class TranslationUtils {
             case LEVEL -> Text.literal(amount + " ").append(Text.translatable("gui.pacpack-quests.levels"));
             case ITEM -> Text.literal(amount + "x ").append(getTranslatedRewardName(reward, RegistryType.ITEM));
             case ENCHANTED_BOOK -> Text.literal(amount + "x ").append(getTranslatedRewardName(reward, RegistryType.ENCHANTMENT));
+            case COMMAND -> Text.literal(amount + "x ").append(Text.literal((reward.startsWith("/") ? "" : "/") + (reward.length() > 64 ? reward.substring(0, 64) + "..." : reward)));
         };
 
         if (isClaimed) {
@@ -40,13 +41,14 @@ public class TranslationUtils {
             case LEVEL -> text.formatted(Formatting.DARK_GREEN, Formatting.BOLD);
             case ITEM -> text.formatted(Formatting.WHITE);
             case ENCHANTED_BOOK -> text.formatted(Formatting.LIGHT_PURPLE);
+            case COMMAND -> text.formatted(Formatting.YELLOW);
         };
     }
 
     /**
      * Translate an id (e.g. "minecraft:stone", "#minecraft:logs", or an enchanted book) into a readable name.
      * @param entryId a valid ID or tag.
-     * @param type the type of the ID corresponding to a Minecraft Registry.
+     * @param type the taskType of the ID corresponding to a Minecraft Registry.
      */
     public static String getTranslatedName(String entryId, RegistryType type) {
         return getTranslatedName(entryId, type, false);
@@ -60,7 +62,15 @@ public class TranslationUtils {
     }
 
     public static String getTranslatedName(String entryId, RegistryType type, boolean isReward) {
-        if (entryId == null || entryId.isEmpty()) return "...";
+        if (entryId == null || entryId.isEmpty() || type == null) return "...";
+
+        if (type == RegistryType.COMMAND) {
+            String command = (entryId.startsWith("/") ? "" : "/") + entryId;
+            if (command.length() > 24) {
+                command = command.substring(0, 24) + "...";
+            }
+            return command;
+        }
 
         if (type == RegistryType.ENCHANTMENT || entryId.startsWith("enchanted_book:") || entryId.startsWith("minecraft:enchanted_book:")) {
             return getEnchantedBookName(entryId);
@@ -123,5 +133,19 @@ public class TranslationUtils {
         }
 
         return entryId;
+    }
+
+    // Helper to format the long IDs into short readable button texts (e.g., "minecraft:stone" -> "Stone")
+    public static String formatDisplayString(String raw) {
+        if (raw == null || raw.isEmpty()) return "...";
+        boolean isTag = raw.startsWith("#");
+        String clean = isTag ? raw.substring(1) : raw;
+        Identifier id = Identifier.tryParse(clean);
+        if (id == null) return raw;
+
+        String path = id.getPath();
+        String formatted = path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
+        if (formatted.length() > 18) formatted = formatted.substring(0, 15) + "..."; // Truncate long names
+        return isTag ? "# " + formatted : formatted;
     }
 }
