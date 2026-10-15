@@ -67,6 +67,7 @@
   "key.category.pacpack-quests.keys": "PacPack Quests",
   "key.pacpack-quests.open-quest-menu": "Open Quest Menu",
 
+  "reward.pacpack-quests.command": "Command",
   "reward.pacpack-quests.enchanted_book": "Enchanted Book",
   "reward.pacpack-quests.item": "Item",
   "reward.pacpack-quests.level": "XP Level(s)",

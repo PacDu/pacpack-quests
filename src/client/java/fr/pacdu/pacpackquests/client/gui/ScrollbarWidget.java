@@ -42,6 +42,14 @@ public class ScrollbarWidget {
         return this.scrollAmount;
     }
 
+    public void setScrollAmount(double scrollAmount) {
+        this.scrollAmount = MathHelper.clamp(scrollAmount, 0, this.maxScroll);
+    }
+
+    public void resetScroll() {
+        this.scrollAmount = 0;
+    }
+
     public void render(DrawContext context, int mouseX, int mouseY) {
         if (maxScroll <= 0) return;
         

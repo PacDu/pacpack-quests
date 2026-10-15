@@ -87,6 +87,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					ButtonWidget.builder(Text.literal(I18n.translate("gui.pacpack-quests.edit") + ": " + (isEditMode ? "ON" : "OFF")).formatted(isEditMode ? Formatting.GREEN : Formatting.RED), button -> {
 								this.isEditMode = !this.isEditMode;
 								this.clearAndInit(); // Refresh screen to update button text and visuals
+								this.clampPanning();
 							})
 							.dimensions(startX + windowWidth - buttonWidth, startY - 25, buttonWidth, buttonHeight)
 							.build()
@@ -525,8 +526,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					}
 				}
 
-				if ((localMouseX - 16) % 48 < 24 && (localMouseY - 16) % 48 < 24) {
-					// Create new quest on empty space
+				if ((localMouseX - PADDING) % 48 < 24 && (localMouseY - PADDING) % 48 < 24
+						&& localMouseX >= PADDING && localMouseY >= PADDING
+						&& localMouseX <= PADDING + 48 * maxGridColumns
+						&& localMouseY <= PADDING + 48 * maxGridRows) {
+					// Create new quest on empty nodes
 					int gridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
 					int gridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
 					MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, gridX, gridY));

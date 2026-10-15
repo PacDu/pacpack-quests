@@ -174,13 +174,25 @@ public class EditQuestScreen extends Screen {
         y += yStep - 10;
         this.taskTypeButton = ButtonWidget.builder(
                 Text.translatable("form.pacpack-quests.task_type").append(Text.literal(": ")).append(Text.translatable("task.pacpack-quests." + currentTaskType.name().toLowerCase())),
-                button -> this.isTaskDropdownOpen = !this.isTaskDropdownOpen
+                button -> {
+                    this.isTaskDropdownOpen = !this.isTaskDropdownOpen;
+                    if (this.isTaskDropdownOpen) {
+                        this.isRewardDropdownOpen = false;
+                    }
+                    this.dropdownScrollbar.resetScroll();
+                }
         ).dimensions(col1, y, fieldWidth, fieldHeight).build();
         this.addDrawableChild(this.taskTypeButton);
 
         this.rewardTypeButton = ButtonWidget.builder(
                 Text.translatable("form.pacpack-quests.reward_type").append(Text.literal(": ")).append(Text.translatable("reward.pacpack-quests." + currentRewardType.name().toLowerCase())),
-                button -> this.isRewardDropdownOpen = !this.isRewardDropdownOpen
+                button -> {
+                    this.isRewardDropdownOpen = !this.isRewardDropdownOpen;
+                    if (this.isRewardDropdownOpen) {
+                        this.isTaskDropdownOpen = false;
+                    }
+                    this.dropdownScrollbar.resetScroll();
+                }
         ).dimensions(col2, y, fieldWidth, fieldHeight).build();
         this.addDrawableChild(this.rewardTypeButton);
 
@@ -415,13 +427,19 @@ public class EditQuestScreen extends Screen {
     @Override
     public boolean mouseClicked(Click click, boolean doubled) {
         if (this.isTaskDropdownOpen && this.taskTypeButton != null) {
-            if (handleDropdownClick(click, this.taskTypeButton, TaskType.values(), this::selectTaskType, () -> this.isTaskDropdownOpen = false)) {
+            if (handleDropdownClick(click, this.taskTypeButton, TaskType.values(), this::selectTaskType, () -> {
+                this.isTaskDropdownOpen = false;
+                this.dropdownScrollbar.resetScroll();
+            })) {
                 return true;
             }
         }
 
         if (this.isRewardDropdownOpen && this.rewardTypeButton != null) {
-            if (handleDropdownClick(click, this.rewardTypeButton, RewardType.values(), this::selectRewardType, () -> this.isRewardDropdownOpen = false)) {
+            if (handleDropdownClick(click, this.rewardTypeButton, RewardType.values(), this::selectRewardType, () -> {
+                this.isRewardDropdownOpen = false;
+                this.dropdownScrollbar.resetScroll();
+            })) {
                 return true;
             }
         }

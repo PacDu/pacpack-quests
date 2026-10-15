@@ -11,6 +11,8 @@ import java.util.List;
 public abstract class AbstractQuestGridScreen extends Screen {
 
     protected int windowWidth, windowHeight, startX, startY;
+
+    protected static final int PADDING = 16;
     
     // --- Camera & Canvas System ---
     protected static double panX = 0;
@@ -19,9 +21,17 @@ public abstract class AbstractQuestGridScreen extends Screen {
     protected final int gridSpacing = 48;
     protected final int canvasOffsetX = 20;
     protected final int canvasOffsetY = 20;
-    
+
     protected final int tabWidth = 70;
     protected final int tabHeight = 20;
+
+    // Grid size for edit mode constraints
+    protected int maxGridColumns = 20;
+    protected int maxGridRows = 20;
+
+    private record Bounds(int minX, int maxX, int minY, int maxY) {}
+
+    protected abstract List<? extends GridNode> getNodes();
 
     protected AbstractQuestGridScreen(Text title) {
         super(title);
@@ -61,12 +71,16 @@ public abstract class AbstractQuestGridScreen extends Screen {
         return super.mouseDragged(click, deltaX, deltaY);
     }
 
+    protected boolean forceFullGridBounds() {
+        return false;
+    }
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight) {
+            Bounds bounds = getActiveBounds();
             double oldZoom = zoom;
-            zoom += (float) (verticalAmount * 0.15f);
-            zoom = (float) Math.clamp(zoom, 0.3f, 2f);
+            zoom = Math.clamp(zoom + (float) (verticalAmount * 0.15f), getMinZoom(bounds), 2.0f);
 
             double zoomRatio = zoom / oldZoom;
             double relX = mouseX - startX;
@@ -75,69 +89,98 @@ public abstract class AbstractQuestGridScreen extends Screen {
             panX = relX - (relX - panX) * zoomRatio;
             panY = relY - (relY - panY) * zoomRatio;
 
-            clampPanning();
+            clampPanning(bounds);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
-    protected abstract List<? extends GridNode> getNodes();
-
-    protected boolean forceFullGridBounds() {
-        return false;
+    protected void clampPanning() {
+        clampPanning(getActiveBounds());
     }
 
-    // Grid size for edit mode constraints
-    protected int maxGridColumns = 20;
-    protected int maxGridRows = 20;
+    private void clampPanning(Bounds bounds) {
+        zoom = Math.clamp(zoom, getMinZoom(bounds), 2.0f);
 
-    protected void clampPanning() {
-        double currentMinPanX, currentMaxPanX;
-        double currentMinPanY, currentMaxPanY;
+        int gridMaxX = getGridMax(canvasOffsetX, maxGridColumns);
+        int gridMaxY = getGridMax(canvasOffsetY, maxGridRows);
 
-        List<? extends GridNode> nodes = getNodes();
+        if (bounds == null) {
+            // Empty nodes in normal mode: center the pan on the grid
+            panX = (windowWidth - gridMaxX * zoom) / 2.0;
+            panY = (windowHeight - gridMaxY * zoom) / 2.0;
+        } else {
+            panX = clampAxis(panX, windowWidth, gridMaxX, bounds.minX, bounds.maxX);
+            panY = clampAxis(panY, windowHeight, gridMaxY, bounds.minY, bounds.maxY);
+        }
+    }
 
-        int minX = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int maxY = Integer.MIN_VALUE;
+    /**
+     * Computes the active bounding box once:
+     * - Full grid bounds if forceFullGridBounds() is true
+     * - Clamped node bounds in normal mode
+     * - null if there are no visible nodes in normal mode
+     */
+    private Bounds getActiveBounds() {
+        int gridMaxX = getGridMax(canvasOffsetX, maxGridColumns);
+        int gridMaxY = getGridMax(canvasOffsetY, maxGridRows);
 
         if (forceFullGridBounds()) {
-            minX = canvasOffsetX - 4;
-            maxX = canvasOffsetX + (maxGridColumns - 1) * gridSpacing + 28;
-            minY = canvasOffsetY - 4;
-            maxY = canvasOffsetY + (maxGridRows - 1) * gridSpacing + 28;
-        } else if (nodes != null && !nodes.isEmpty()) {
-            for (GridNode node : nodes) {
-                minX = Math.min(minX, node.x() - 4);
-                maxX = Math.max(maxX, node.x() + 20);
-                minY = Math.min(minY, node.y() - 4);
-                maxY = Math.max(maxY, node.y() + 20);
-            }
+            return new Bounds(0, gridMaxX, 0, gridMaxY);
         }
 
-        if (minX == Integer.MAX_VALUE) {
-            currentMinPanX = currentMaxPanX = currentMinPanY = currentMaxPanY = 0;
-        } else {
-            int padding = 16;
-            minX -= padding;
-            maxX += padding;
-            minY -= padding;
-            maxY += padding;
-
-            double boundX1 = -minX * zoom;
-            double boundX2 = windowWidth - maxX * zoom;
-            currentMinPanX = Math.min(boundX1, boundX2);
-            currentMaxPanX = Math.max(boundX1, boundX2);
-
-            double boundY1 = -minY * zoom;
-            double boundY2 = windowHeight - maxY * zoom;
-            currentMinPanY = Math.min(boundY1, boundY2);
-            currentMaxPanY = Math.max(boundY1, boundY2);
+        List<? extends GridNode> nodes = getNodes();
+        if (nodes == null || nodes.isEmpty()) {
+            return null;
         }
 
-        panX = Math.clamp(panX, currentMinPanX, currentMaxPanX);
-        panY = Math.clamp(panY, currentMinPanY, currentMaxPanY);
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+        int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
+
+        for (GridNode node : nodes) {
+            minX = Math.min(minX, node.x());
+            maxX = Math.max(maxX, node.x());
+            minY = Math.min(minY, node.y());
+            maxY = Math.max(maxY, node.y());
+        }
+
+        return new Bounds(
+                Math.max(0, minX - 4 - PADDING),
+                Math.min(gridMaxX, maxX + 20 + PADDING),
+                Math.max(0, minY - 4 - PADDING),
+                Math.min(gridMaxY, maxY + 20 + PADDING)
+        );
+    }
+
+    private int getGridMax(int offset, int count) {
+        return offset + (count - 1) * gridSpacing + 28 + PADDING;
+    }
+
+    /**
+     * Calculates the minimum allowed zoom so the user can zoom out to see the entire active area,
+     * while always allowing at least 1.0f scale.
+     */
+    private float getMinZoom(Bounds b) {
+        int width = b != null ? b.maxX - b.minX : getGridMax(canvasOffsetX, maxGridColumns);
+        int height = b != null ? b.maxY - b.minY : getGridMax(canvasOffsetY, maxGridRows);
+
+        float fitZoom = Math.min((float) windowWidth / Math.max(1, width), (float) windowHeight / Math.max(1, height));
+        return Math.clamp(fitZoom, 0.05f, 1.0f);
+    }
+
+    /**
+     * Computes and clamps the pan value for a single axis (X or Y),
+     * restricting it to the active bounds without exceeding the grid bounds.
+     */
+    @SuppressWarnings("MathClampMigration") // False positive, we remove the warning
+    private double clampAxis(double pan, int windowSize, int gridMax, int nodeMin, int nodeMax) {
+        double g2 = windowSize - gridMax * zoom;
+        double n1 = -nodeMin * zoom, n2 = windowSize - nodeMax * zoom;
+
+        double minPan = Math.max(Math.min(0, g2), Math.min(n1, n2));
+        double maxPan = Math.min(Math.max(0, g2), Math.max(n1, n2));
+
+        return minPan > maxPan ? (minPan + maxPan) / 2.0 : Math.clamp(pan, minPan, maxPan);
     }
 
     // --- RENDER HELPERS ---
