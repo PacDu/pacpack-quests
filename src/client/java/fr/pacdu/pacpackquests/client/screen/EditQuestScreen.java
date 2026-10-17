@@ -16,6 +16,7 @@ import net.minecraft.client.gui.cursor.StandardCursors;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.resource.language.I18n;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
@@ -61,11 +62,8 @@ public class EditQuestScreen extends Screen {
     private String initialReward = "";
     private String errorMessage = null;
     private List<String> selectedParents = new ArrayList<>();
-
-    public void updateParents(List<String> parents) {
-        this.selectedParents = new ArrayList<>(parents);
-    }
     private boolean isInitialized = false;
+    private QuestDefinition duplicatedQuest = null;
 
     public EditQuestScreen(QuestScreen parent, String questId, String category, int gridX, int gridY) {
         super(Text.literal(questId == null ? I18n.translate("gui.pacpack-quests.create_new_quest") : I18n.translate("gui.pacpack-quests.edit_quest")));
@@ -74,6 +72,11 @@ public class EditQuestScreen extends Screen {
         this.category = category;
         this.gridX = gridX;
         this.gridY = gridY;
+    }
+
+    public EditQuestScreen(QuestScreen parent, String questId, String category, int gridX, int gridY, QuestDefinition duplicatedQuest) {
+        this(parent, questId, category, gridX, gridY);
+        this.duplicatedQuest = duplicatedQuest;
     }
 
     @Override
@@ -95,8 +98,8 @@ public class EditQuestScreen extends Screen {
         this.initialReward = "";
 
         // 1. Load data from memory if we are editing a quest
-        if (questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) {
-            QuestDefinition def = PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
+        if ((questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) || duplicatedQuest != null) {
+            QuestDefinition def = duplicatedQuest != null ? duplicatedQuest : PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
             initialTitle = def.title();
             
             if (!this.isInitialized) {
@@ -120,7 +123,7 @@ public class EditQuestScreen extends Screen {
         this.isInitialized = true;
 
         // 2. Override initial values with current field contents (if they exist)
-        String currentId = this.idField != null ? this.idField.getText() : "";
+        String currentId = this.idField != null ? this.idField.getText() : duplicatedQuest != null ? duplicatedQuest.id() : "";
         if (this.titleField != null) initialTitle = this.titleField.getText();
         if (this.reqAmountField != null) initialReqAmt = this.reqAmountField.getText();
         if (this.rewardAmountField != null) initialRewAmt = this.rewardAmountField.getText();
@@ -144,7 +147,7 @@ public class EditQuestScreen extends Screen {
             this.idField.setText(questId);
             this.idField.setEditable(false);
         } else {
-            // Restore the ID typed during the creation of a new quest
+            // Restore the ID typed during the creation of a new quest or the duplication of another one
             this.idField.setText(currentId);
             this.idField.setPlaceholder(Text.translatable("form.pacpack-quests.quest_id_placeholder").formatted(Formatting.DARK_GRAY));
         }
@@ -261,6 +264,8 @@ public class EditQuestScreen extends Screen {
                 this.client.setScreen(parent);
             }).dimensions(this.width / 2 + 55, y, 50, fieldHeight).build());
         }
+
+        this.duplicatedQuest = null;
     }
 
     private void updateRewardButtonMessage() {
@@ -447,6 +452,15 @@ public class EditQuestScreen extends Screen {
         return super.mouseClicked(click, doubled);
     }
 
+    @Override
+    public boolean keyPressed(KeyInput input) {
+        if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)  {
+            this.client.setScreen(parent);
+            return true;
+        }
+        return super.keyPressed(input);
+    }
+
     private <E extends Enum<E>> boolean handleDropdownClick(Click click, ButtonWidget button, E[] values, Consumer<E> onSelect, Runnable closeDropdown) {
         int dropX = button.getX();
         int dropY = button.getY() + button.getHeight();
@@ -594,5 +608,9 @@ public class EditQuestScreen extends Screen {
         if (maxScroll > 0) {
             this.dropdownScrollbar.render(context, mouseX, mouseY);
         }
+    }
+
+    public void updateParents(List<String> parents) {
+        this.selectedParents = new ArrayList<>(parents);
     }
 }

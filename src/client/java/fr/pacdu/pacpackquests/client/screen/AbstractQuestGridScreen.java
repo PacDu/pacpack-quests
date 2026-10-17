@@ -29,6 +29,8 @@ public abstract class AbstractQuestGridScreen extends Screen {
     protected int maxGridColumns = 20;
     protected int maxGridRows = 20;
 
+    protected String draggedQuestId = null;
+
     private record Bounds(int minX, int maxX, int minY, int maxY) {}
 
     protected abstract List<? extends GridNode> getNodes();
@@ -235,7 +237,7 @@ public abstract class AbstractQuestGridScreen extends Screen {
     }
 
     protected boolean isHovering(int x, int y, int width, int height, double localMouseX, double localMouseY) {
-        return localMouseX >= x && localMouseX <= x + width && localMouseY >= y && localMouseY <= y + height;
+        return localMouseX >= x && localMouseX <= x + width && localMouseY >= y && localMouseY <= y + height && draggedQuestId == null;
     }
 
     protected boolean isHoveringNode(int nodeX, int nodeY, double localMouseX, double localMouseY) {

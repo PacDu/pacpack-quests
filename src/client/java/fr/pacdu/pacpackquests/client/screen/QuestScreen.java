@@ -41,13 +41,14 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	// --- Edit Mode System ---
 	private boolean isEditMode = false;
-	private String draggedQuestId = null;
 	private String categoryClickTarget = null;
 	private String categoryEditTarget = null;
 	private String draggedCategory = null;
+	private QuestDefinition duplicatedQuest = null;
 	private final ScrollbarWidget categoryScrollbar = new ScrollbarWidget(0, 0, 6, 0, 25, true);
 
-	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType type, String target, ItemStack icon, String reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) implements GridNode {}
+	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType taskType, String target, int requiredAmount, ItemStack icon, String reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) implements GridNode {}
+	record GridPos(int x, int y) {}
 
 	public QuestScreen() {
 		super(Text.translatable("gui.pacpack-quests.quest_menu"));
@@ -135,7 +136,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 				questList.add(new QuestNode(
 						quest.id(), quest.title(), quest.displayX(), quest.displayY(), localX, localY,
-						quest.taskType(), quest.target(), quest.icon(), quest.reward(),
+						quest.taskType(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
 						quest.rewardType(), quest.rewardAmount(), quest.parents(), locked
 				));
 			}
@@ -241,7 +242,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		double localMouseX = (mouseX - startX - panX) / zoom;
 		double localMouseY = (mouseY - startY - panY) / zoom;
-		boolean isMouseInWindow = mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight;
+		boolean isMouseInWindow = isMouseInWindow(mouseX, mouseY);
 
 		QuestNode hoveredNode = null;
 		QuestNode nodeBeingDragged = null;
@@ -301,27 +302,52 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			}
 		}
 
-		// --- DRAW DRAGGED NODE AT CURSOR ---
-		if (nodeBeingDragged != null && isMouseInWindow) {
-			// Temporarily replace X/Y with mouse coordinates for rendering
-			QuestNode movingNode = new QuestNode(
-					nodeBeingDragged.id(), nodeBeingDragged.title(), nodeBeingDragged.displayX(), nodeBeingDragged.displayY(),
-					(int) localMouseX - 12, (int) localMouseY - 12, nodeBeingDragged.type(), nodeBeingDragged.target(),
-					nodeBeingDragged.icon(), nodeBeingDragged.reward(), nodeBeingDragged.rewardType(),
-					nodeBeingDragged.rewardAmount(), nodeBeingDragged.parents(), nodeBeingDragged.isLocked()
+		// --- LOAD NODE FOR QUEST BEING DUPLICATED ---
+		if (duplicatedQuest != null) {
+			int localX = canvasOffsetX + (duplicatedQuest.displayX() * gridSpacing);
+			int localY = canvasOffsetY + (duplicatedQuest.displayY() * gridSpacing);
+			nodeBeingDragged = new QuestNode(duplicatedQuest.id(), duplicatedQuest.title(), duplicatedQuest.displayX(),
+					duplicatedQuest.displayY(), localX, localY, duplicatedQuest.taskType(),
+					duplicatedQuest.target(), duplicatedQuest.requiredAmount(), duplicatedQuest.icon(), duplicatedQuest.reward(), duplicatedQuest.rewardType(),
+					duplicatedQuest.rewardAmount(), duplicatedQuest.parents(), false
 			);
-			renderNode(context, movingNode, localMouseX, localMouseY, false);
+		}
+
+		// --- DRAW DRAGGED NODE AT CURSOR ---
+		if (nodeBeingDragged != null) {
 			// Draw a semi-transparent drop shadow snapped to the grid to show where it will land
-			int dropGridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
-			int dropGridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
+			int dropGridX = nodeBeingDragged.displayX();
+			int dropGridY = nodeBeingDragged.displayY();
+			if (isMouseInWindow || duplicatedQuest != null) {
+				dropGridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
+				dropGridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
+				GridPos pos = searchNearestEmptySlot(dropGridX, dropGridY);
+				if (pos != null) {
+					dropGridX = pos.x();
+					dropGridY = pos.y();
+				}
+			}
 			int snapX = canvasOffsetX + (dropGridX * gridSpacing);
 			int snapY = canvasOffsetY + (dropGridY * gridSpacing);
 			context.fill(snapX - 4, snapY - 4, snapX + 20, snapY + 20, 0x5500FF00); // Green drop highlight
 		}
 
-		context.getMatrices().popMatrix();
 		context.disableScissor();
 
+		if (nodeBeingDragged != null) {
+			// Temporarily replace X/Y with mouse coordinates for rendering
+			QuestNode movingNode = new QuestNode(
+					nodeBeingDragged.id(), nodeBeingDragged.title(), nodeBeingDragged.displayX(), nodeBeingDragged.displayY(),
+					(int) localMouseX - 12, (int) localMouseY - 12, nodeBeingDragged.taskType(), nodeBeingDragged.target(),
+					nodeBeingDragged.requiredAmount(), nodeBeingDragged.icon(), nodeBeingDragged.reward(), nodeBeingDragged.rewardType(),
+					nodeBeingDragged.rewardAmount(), nodeBeingDragged.parents(), nodeBeingDragged.isLocked()
+			);
+			renderNode(context, movingNode, localMouseX, localMouseY, false);
+		}
+
+		context.getMatrices().popMatrix();
+
+		// --- DRAW TOOLTIP ---
 		if (hoveredNode != null && !isEditMode) { // Tooltips can get in the way during editing
 			drawQuestTooltip(context, hoveredNode, mouseX, mouseY);
 		} else if (hoveredNode != null) {
@@ -329,6 +355,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			editTooltip.add(Text.translatable("gui.pacpack-quests.edit_action").formatted(Formatting.YELLOW, Formatting.BOLD));
 			editTooltip.add(Text.translatable("gui.pacpack-quests.click_drag").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_move").formatted(Formatting.WHITE)));
 			editTooltip.add(Text.translatable("gui.pacpack-quests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_edit_delete").formatted(Formatting.WHITE)));
+			editTooltip.add(Text.translatable("gui.pacpack-quests.middle_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_duplicate").formatted(Formatting.WHITE)));
 			context.drawTooltip(this.textRenderer, editTooltip, mouseX, mouseY);
 		} else if (hoveredDotX >= 0 && hoveredDotY >= 0 && isEditMode) {
 			List<Text> editTooltip = new ArrayList<>();
@@ -340,13 +367,12 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	private void renderNode(DrawContext context, QuestNode quest, double localMouseX, double localMouseY, boolean checkHover) {
 		int progress = CLIENT_PROGRESS.getOrDefault(quest.id(), 0);
-		int requiredAmount = CLIENT_DEFINITIONS.get(quest.id()).requiredAmount();
 		boolean claimed = CLIENT_CLAIMED.getOrDefault(quest.id(), false);
 
 		int bgColor = 0xFF333333;
 		if (quest.isLocked()) bgColor = 0xFF221111;
 		else if (claimed) bgColor = 0xFF225522;
-		else if (progress >= requiredAmount) bgColor = !isEditMode && checkHover && isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY) ? 0xFF808033 : 0xFF555522;
+		else if (progress >= quest.requiredAmount()) bgColor = !isEditMode && checkHover && isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY) ? 0xFF808033 : 0xFF555522;
 
 		// Highlight hovered node in edit mode
 		if (isEditMode && checkHover && isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
@@ -360,11 +386,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			textToDraw = Text.literal("???");
 			textColor = 0xFFFF5555;
 		} else if (claimed) {
-			textToDraw = Text.literal(progress + "/" + requiredAmount);
+			textToDraw = Text.literal(progress + "/" + quest.requiredAmount());
 			textColor = 0xFF55FF55;
 		} else {
-			textToDraw = Text.literal(progress + "/" + requiredAmount);
-			textColor = progress >= requiredAmount ? 0xFFFFFF55 : 0xFFAAAAAA;
+			textToDraw = Text.literal(progress + "/" + quest.requiredAmount());
+			textColor = progress >= quest.requiredAmount() ? 0xFFFFFF55 : 0xFFAAAAAA;
 		}
 
 		context.drawCenteredTextWithShadow(this.textRenderer, textToDraw, quest.x() + 8, quest.y() + 22, textColor);
@@ -391,7 +417,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			tooltip.add(statusLabel.append(Text.translatable("gui.pacpack-quests.locked").formatted(Formatting.RED)));
 		} else {
 			// Task target (e.g., Craft: Shield)
-			tooltip.add(Text.translatable("gui.pacpack-quests." + quest.type().toString().toLowerCase())
+			tooltip.add(Text.translatable("gui.pacpack-quests." + quest.taskType().toString().toLowerCase())
 					.append(": ")
 					.append(Text.literal(getTranslatedTargetName(quest.target())))
 					.formatted(Formatting.GRAY));
@@ -418,11 +444,13 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	@Override
 	public boolean mouseClicked(Click click, boolean doubled) {
+		if (draggedQuestId != null) return true;
+
 		double mouseX = click.x();
 		double mouseY = click.y();
 		double localMouseX = (mouseX - startX - panX) / zoom;
 		double localMouseY = (mouseY - startY - panY) / zoom;
-		boolean isMouseInWindow = mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight;
+		boolean isMouseInWindow = isMouseInWindow(click.x(), click.y());
 
 		if (click.button() == 0) { // Left Click
 			if (categoryScrollbar.mouseClicked(mouseX, mouseY, 0)) {
@@ -510,7 +538,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		// Edit Mode Logic (Node interaction)
 		if (isEditMode && isMouseInWindow) {
-			if (click.button() == 0) { // Left Click: Pick up node to drag
+			if (click.button() == 0 && draggedQuestId == null) { // Left Click: Pick up node to drag
 				for (QuestNode quest : questList) {
 					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
 						draggedQuestId = quest.id();
@@ -535,6 +563,17 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					int gridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
 					MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, gridX, gridY));
 					return true;
+				}
+			} else if (click.button() == 2) { // Middle Click: Duplicate Quest
+				for (QuestNode quest : questList) {
+					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
+						QuestDefinition newQuest = new QuestDefinition(quest.id + "_copy", quest.title + " Copy",
+								selectedCategory, quest.taskType, quest.target, quest.rewardAmount, quest.icon,
+								quest.reward, quest.rewardType, quest.rewardAmount, quest.parents, quest.displayX, quest.displayY);
+						draggedQuestId = newQuest.id();
+						duplicatedQuest = newQuest;
+						return true;
+					}
 				}
 			}
 		}
@@ -577,7 +616,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 
 		// If holding a node, do NOT pan the camera
-		if (isEditMode && draggedQuestId != null) {
+		if (isEditMode && draggedQuestId != null && click.button() == 0) {
 			return true;
 		}
 
@@ -615,44 +654,41 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			int dropGridX = Math.round(((float) localMouseX - canvasOffsetX) / gridSpacing);
 			int dropGridY = Math.round(((float) localMouseY - canvasOffsetY) / gridSpacing);
 
-			QuestDefinition oldDef = CLIENT_DEFINITIONS.get(draggedQuestId);
+			QuestDefinition oldDef = duplicatedQuest != null ? duplicatedQuest : CLIENT_DEFINITIONS.get(draggedQuestId);
 			if (oldDef != null) {
 				int finalX = dropGridX;
 				int finalY = dropGridY;
 				boolean foundSpot = false;
 
-				// Spiral search to find the nearest empty spot (max radius 3)
-				int maxRadius = 3;
-				searchLoop:
-				for (int r = 0; r <= maxRadius; r++) {
-					for (int dx = -r; dx <= r; dx++) {
-						for (int dy = -r; dy <= r; dy++) {
-							if (Math.abs(dx) == r || Math.abs(dy) == r) { // Check perimeter of current radius
-								int checkX = dropGridX + dx;
-								int checkY = dropGridY + dy;
-
-								// Ensure we stay within the 20x20 grid limits
-								if (checkX >= 0 && checkX < 20 && checkY >= 0 && checkY < 20) {
-									if (!isGridOccupied(checkX, checkY, draggedQuestId)) {
-										finalX = checkX;
-										finalY = checkY;
-										foundSpot = true;
-										break searchLoop;
-									}
-								}
-							}
-						}
-					}
+				GridPos spot = searchNearestEmptySlot(dropGridX, dropGridY);
+				if (spot != null) {
+					finalX = spot.x;
+					finalY = spot.y;
+					foundSpot = true;
 				}
 
-				// Fallback to the original coordinates if the area is completely full or out of bounds
-				if (!foundSpot) {
+				if (!foundSpot && duplicatedQuest != null) {
+					duplicatedQuest = null;
+					draggedQuestId = null;
+					return true;
+				}
+
+				// Fallback to the original coordinates if the area is completely full or mouse is out of window
+				if (!foundSpot || !isMouseInWindow(click.x(), click.y())) {
+					if (duplicatedQuest != null) return true;
 					finalX = oldDef.displayX();
 					finalY = oldDef.displayY();
 				}
 
+				// Open edit screen after releasing the duplicated quest
+				if (duplicatedQuest != null) {
+					duplicatedQuest = null;
+					draggedQuestId = null;
+					MinecraftClient.getInstance().setScreen(new EditQuestScreen(this, null, selectedCategory, finalX, finalY, oldDef));
+				}
+
 				// Only send packet and update if the position actually changed
-				if (finalX != oldDef.displayX() || finalY != oldDef.displayY()) {
+				else if (finalX != oldDef.displayX() || finalY != oldDef.displayY()) {
 					ClientPlayNetworking.send(new MoveQuestPayload(draggedQuestId, finalX, finalY));
 
 					QuestDefinition newDef = new QuestDefinition(
@@ -714,11 +750,50 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			return super.keyPressed(input);
 		}
 
+		if (duplicatedQuest != null) {
+			if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)  {
+				duplicatedQuest = null;
+				draggedQuestId = null;
+				return true;
+			}
+		}
+
 		if (openQuestMenuKey.matchesKey(input)) {
 			this.close();
 			return true;
 		}
 		return super.keyPressed(input);
+	}
+
+	private GridPos searchNearestEmptySlot(int dropGridX, int dropGridY) {
+		// Clamp target coordinates inside the grid first
+		int targetX = Math.clamp(dropGridX, 0, maxGridColumns - 1);
+		int targetY = Math.clamp(dropGridY, 0, maxGridRows - 1);
+
+		// Fast path: if the target slot is already free, return it immediately
+		if (!isGridOccupied(targetX, targetY, draggedQuestId)) {
+			return new GridPos(targetX, targetY);
+		}
+
+		GridPos bestPos = null;
+		int minDistanceSq = Integer.MAX_VALUE;
+
+		// Scan the grid and find the empty slot with the shortest Euclidean distance
+		for (int x = 0; x < maxGridColumns; x++) {
+			for (int y = 0; y < maxGridRows; y++) {
+				int dx = x - targetX;
+				int dy = y - targetY;
+				int distSq = dx * dx + dy * dy;
+
+				// Only check occupation if this slot is strictly closer than our current best
+				if (distSq < minDistanceSq && !isGridOccupied(x, y, draggedQuestId)) {
+					minDistanceSq = distSq;
+					bestPos = new GridPos(x, y);
+				}
+			}
+		}
+
+		return bestPos;
 	}
 
 	private String getTranslatedTargetName(String target) {
@@ -823,6 +898,10 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			}
 		}
 		return false;
+	}
+
+	private boolean isMouseInWindow(double mouseX, double mouseY) {
+		return mouseX >= startX && mouseX <= startX + windowWidth && mouseY >= startY && mouseY <= startY + windowHeight;
 	}
 
 	public void updateClaimButtonState() {
