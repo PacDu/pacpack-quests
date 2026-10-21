@@ -2,6 +2,7 @@ package fr.pacdu.pacpackquests.config;
 
 import com.google.gson.*;
 import fr.pacdu.pacpackquests.PacPackQuests;
+import fr.pacdu.pacpackquests.util.PathSecurity;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.Reader;
@@ -29,7 +30,10 @@ public class ModConfig {
                             categoryOrder.clear();
                             JsonArray categoryOrderArray = json.getAsJsonArray("categoryOrder");
                             for (JsonElement element : categoryOrderArray) {
-                                categoryOrder.add(element.getAsString());
+                                String cat = element.getAsString();
+                                if (PathSecurity.isValidIdentifier(cat)) {
+                                    categoryOrder.add(cat);
+                                }
                             }
                         }
                         else configIsMissing = true;

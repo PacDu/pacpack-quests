@@ -43,7 +43,7 @@ public class SelectionScreen extends Screen {
     private int rows;
     private int maxVisible;
     private boolean withTags = true;
-    private boolean isReward = true;
+    private boolean isReward = false;
 
     public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected) {
         super(Text.translatable("gui.pacpack-quests.select_element"));

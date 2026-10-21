@@ -13,6 +13,7 @@ import net.minecraft.client.gui.screen.ConfirmScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
+import fr.pacdu.pacpackquests.util.PathSecurity;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.resource.language.I18n;
 import net.minecraft.command.DefaultPermissions;
@@ -23,8 +24,10 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.*;
 
@@ -96,8 +99,20 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 
 		// --- Categories Setup ---
-		this.inlineCategoryField = new TextFieldWidget(this.textRenderer, startX - tabWidth, 0, tabWidth, tabHeight, Text.empty());
-		this.inlineCategoryField.setMaxLength(15);
+		this.inlineCategoryField = new TextFieldWidget(this.textRenderer, startX - tabWidth, 0, tabWidth, tabHeight, Text.empty()) {
+			@Override
+			public void write(String text) {
+				String formatted = text.toLowerCase(Locale.ROOT)
+						.replace("œ", "oe")
+						.replace("æ", "ae");
+				formatted = Normalizer.normalize(formatted, Normalizer.Form.NFD)
+						.replaceAll("\\p{M}", "")
+						.replace(' ', '_')
+						.replaceAll("[^a-z0-9_]", "");
+				super.write(formatted);
+			}
+		};
+		this.inlineCategoryField.setMaxLength(10);
 		this.inlineCategoryField.setVisible(false);
 		this.addDrawableChild(this.inlineCategoryField);
 
@@ -567,8 +582,10 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			} else if (click.button() == 2) { // Middle Click: Duplicate Quest
 				for (QuestNode quest : questList) {
 					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
-						QuestDefinition newQuest = new QuestDefinition(quest.id + "_copy", quest.title + " Copy",
-								selectedCategory, quest.taskType, quest.target, quest.rewardAmount, quest.icon,
+						long suffix = (System.currentTimeMillis() / 1000) % 10000;
+						String newId = quest.id() + "_copy_" + suffix;
+						QuestDefinition newQuest = new QuestDefinition(newId, quest.title + " Copy",
+								selectedCategory, quest.taskType, quest.target, quest.requiredAmount, quest.icon,
 								quest.reward, quest.rewardType, quest.rewardAmount, quest.parents, quest.displayX, quest.displayY);
 						draggedQuestId = newQuest.id();
 						duplicatedQuest = newQuest;
@@ -729,11 +746,13 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	public boolean keyPressed(KeyInput input) {
 		if (this.inlineCategoryField.isVisible() && this.inlineCategoryField.isFocused()) {
 			if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
-				String newName = this.inlineCategoryField.getText().trim().toLowerCase().replace(" ", "_");
-				if (!newName.isEmpty() && categoryEditTarget == null) {
-					ClientPlayNetworking.send(new CreateCategoryPayload(newName));
-					addNewCategory(newName);
-				} else if (!newName.isEmpty()) {
+				String newName = this.inlineCategoryField.getText().trim().toLowerCase(Locale.ROOT).replace(" ", "_");
+				if (PathSecurity.isValidIdentifier(newName) && categoryEditTarget == null) {
+					if (!CLIENT_CATEGORIES.contains(newName)) {
+						ClientPlayNetworking.send(new CreateCategoryPayload(newName));
+						addNewCategory(newName);
+					}
+				} else if (PathSecurity.isValidIdentifier(newName) && !categoryEditTarget.equals(newName)) {
 					ClientPlayNetworking.send(new EditCategoryPayload(categoryEditTarget, newName));
 				}
 				this.inlineCategoryField.setVisible(false);
@@ -919,8 +938,6 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	}
 
 	public void removeCategory(String categoryName) {
-		CLIENT_CATEGORIES.remove(categoryName);
-
 		// If the deleted category was the one open, we switch to another one
 		if (selectedCategory.equals(categoryName)) {
 			selectedCategory = CLIENT_CATEGORIES.isEmpty() ? "main" : CLIENT_CATEGORIES.getFirst();

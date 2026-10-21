@@ -5,6 +5,7 @@ import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.util.PathSecurity;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -181,7 +182,12 @@ public class QuestManager {
         }
 
         if (needSave) {
-            Path completePath = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + filePath);
+            Path root = PathSecurity.getQuestsRootDir();
+            Path completePath = root.resolve(filePath).toAbsolutePath().normalize();
+            if (!PathSecurity.isPathContained(root, completePath)) {
+                PacPackQuests.LOGGER.warn("Blocked unsafe quest save to path: {}", filePath);
+                return errorMessage.toString();
+            }
             try {
                 Files.writeString(completePath, GSON.toJson(json));
             } catch (IOException e) {

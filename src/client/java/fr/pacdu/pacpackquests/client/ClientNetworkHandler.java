@@ -84,6 +84,7 @@ public class ClientNetworkHandler {
 
         ClientPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
             PacPackQuestsClient.CLIENT_DEFINITIONS.entrySet().removeIf(entry -> entry.getValue().category().equals(payload.category()));
+            PacPackQuestsClient.CLIENT_CATEGORIES.remove(payload.category());
 
             if (context.client().currentScreen instanceof QuestScreen questScreen) {
                 questScreen.removeCategory(payload.category());

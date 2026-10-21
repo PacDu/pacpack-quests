@@ -8,6 +8,7 @@ import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestState;
+import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import fr.pacdu.pacpackquests.util.RewardUtils;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -23,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public class ServerNetworkHandler {
@@ -58,9 +60,13 @@ public class ServerNetworkHandler {
             QuestDefinition quest = QuestManager.LOADED_QUESTS.get(payload.questId());
             if (quest == null) return;
 
-            Path questFile = FabricLoader.getInstance().getConfigDir()
-                    .resolve("pacpackquests/quests/" + quest.category() + "/" + payload.questId() + ".json");
+            Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(quest.category(), payload.questId());
+            if (questFileOpt.isEmpty()) {
+                PacPackQuests.LOGGER.warn("Blocked unsafe quest move attempt: category={}, id={}", quest.category(), payload.questId());
+                return;
+            }
 
+            Path questFile = questFileOpt.get();
             if (Files.exists(questFile)) {
                 try {
                     JsonObject json = GSON.fromJson(Files.readString(questFile), JsonObject.class);
@@ -99,10 +105,17 @@ public class ServerNetworkHandler {
         ServerPlayNetworking.registerGlobalReceiver(SaveQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
             if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
-            Path categoryDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + payload.category());
+            Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(payload.category());
+            Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(payload.category(), payload.questId());
+            if (categoryDirOpt.isEmpty() || questFileOpt.isEmpty()) {
+                PacPackQuests.LOGGER.warn("Blocked unsafe save quest attempt: category={}, id={}", payload.category(), payload.questId());
+                return;
+            }
+
+            Path categoryDir = categoryDirOpt.get();
             try { Files.createDirectories(categoryDir); } catch (Exception ignored) {}
 
-            Path questFile = categoryDir.resolve(payload.questId() + ".json");
+            Path questFile = questFileOpt.get();
 
             JsonObject json = new JsonObject();
             json.addProperty("title", payload.title());
@@ -155,7 +168,12 @@ public class ServerNetworkHandler {
 
             QuestDefinition def = QuestManager.LOADED_QUESTS.get(payload.questId());
             if (def != null) {
-                Path questFile = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + def.category() + "/" + payload.questId() + ".json");
+                Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(def.category(), payload.questId());
+                if (questFileOpt.isEmpty()) {
+                    PacPackQuests.LOGGER.warn("Blocked unsafe delete quest attempt: category={}, id={}", def.category(), payload.questId());
+                    return;
+                }
+                Path questFile = questFileOpt.get();
                 try {
                     Files.deleteIfExists(questFile);
                     QuestManager.LOADED_QUESTS.remove(payload.questId());
@@ -170,12 +188,19 @@ public class ServerNetworkHandler {
         ServerPlayNetworking.registerGlobalReceiver(CreateCategoryPayload.ID, (payload, context) -> context.server().execute(() -> {
             if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
-            Path categoryDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + payload.category());
+            Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(payload.category());
+            if (categoryDirOpt.isEmpty()) {
+                PacPackQuests.LOGGER.warn("Blocked unsafe create category attempt: {}", payload.category());
+                return;
+            }
+            Path categoryDir = categoryDirOpt.get();
             try {
                 if (!Files.exists(categoryDir)) {
                     Files.createDirectories(categoryDir);
-                    ModConfig.categoryOrder.add(payload.category());
-                    ModConfig.save();
+                    if (!ModConfig.categoryOrder.contains(payload.category())) {
+                        ModConfig.categoryOrder.add(payload.category());
+                        ModConfig.save();
+                    }
                 }
                 context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new CreateCategoryPayload(payload.category())));
             } catch (Exception e) {
@@ -188,17 +213,22 @@ public class ServerNetworkHandler {
             if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
             String categoryToDelete = payload.category();
-            Path categoryDir = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + categoryToDelete);
+            Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(categoryToDelete);
+            if (categoryDirOpt.isEmpty()) {
+                PacPackQuests.LOGGER.warn("Blocked unsafe delete category attempt: {}", categoryToDelete);
+                return;
+            }
+            Path categoryDir = categoryDirOpt.get();
 
             try {
                 File dir = categoryDir.toFile();
-                if (dir.exists()) {
-                    File[] files = dir.listFiles();
+                if (dir.exists() && dir.isDirectory()) {
+                    File[] files = dir.listFiles((d, name) -> name.endsWith(".json"));
                     if (files != null) {
                         for (File file : files) file.delete();
                     }
                     dir.delete();
-                    ModConfig.categoryOrder.remove(payload.category());
+                    ModConfig.categoryOrder.remove(categoryToDelete);
                     ModConfig.save();
                 }
 
@@ -214,12 +244,17 @@ public class ServerNetworkHandler {
         ServerPlayNetworking.registerGlobalReceiver(ReorderCategoryPayload.ID, (payload, context) -> context.server().execute(() -> {
             if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
-            ModConfig.categoryOrder = payload.categories();
+            List<String> validCategories = payload.categories().stream()
+                    .filter(PathSecurity::isValidIdentifier)
+                    .toList();
+
+            ModConfig.categoryOrder = new ArrayList<>(validCategories);
             ModConfig.save();
 
+            ReorderCategoryPayload sanitizedPayload = new ReorderCategoryPayload(validCategories);
             for (var player : context.server().getPlayerManager().getPlayerList()) {
                 if (player != context.player()) {
-                    ServerPlayNetworking.send(player, payload);
+                    ServerPlayNetworking.send(player, sanitizedPayload);
                 }
             }
         }));
@@ -255,12 +290,23 @@ public class ServerNetworkHandler {
 
             String categoryOld = payload.categoryOld();
             String categoryNew = payload.categoryNew();
-            Path categoryDirOld = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + categoryOld);
-            Path categoryDirNew = FabricLoader.getInstance().getConfigDir().resolve("pacpackquests/quests/" + categoryNew);
+
+            if (categoryOld == null || categoryNew == null || categoryOld.equals(categoryNew)) return;
+
+            Optional<Path> categoryDirOldOpt = PathSecurity.getSafeCategoryDir(categoryOld);
+            Optional<Path> categoryDirNewOpt = PathSecurity.getSafeCategoryDir(categoryNew);
+
+            if (categoryDirOldOpt.isEmpty() || categoryDirNewOpt.isEmpty()) {
+                PacPackQuests.LOGGER.warn("Blocked unsafe edit category attempt: old={}, new={}", categoryOld, categoryNew);
+                return;
+            }
+
+            Path categoryDirOld = categoryDirOldOpt.get();
+            Path categoryDirNew = categoryDirNewOpt.get();
 
             try {
                 File dir = categoryDirOld.toFile();
-                if (dir.exists()) {
+                if (dir.exists() && dir.isDirectory()) {
                     File newDir = categoryDirNew.toFile();
                     dir.renameTo(newDir);
                 }
@@ -276,6 +322,12 @@ public class ServerNetworkHandler {
                             quest.taskType(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
                             quest.rewardType(), quest.rewardAmount(), quest.parents(), quest.displayX(), quest.displayY());
                     QuestManager.LOADED_QUESTS.put(quest.id(), updatedQuest);
+                }
+
+                int index = ModConfig.categoryOrder.indexOf(categoryOld);
+                if (index != -1) {
+                    ModConfig.categoryOrder.set(index, categoryNew);
+                    ModConfig.save();
                 }
 
                 EditCategoryPayload syncPayload = new EditCategoryPayload(categoryOld, categoryNew);

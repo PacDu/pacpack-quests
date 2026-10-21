@@ -7,6 +7,7 @@ import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.SaveQuestPayload;
+import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
@@ -143,6 +144,7 @@ public class EditQuestScreen extends Screen {
                 super.write(formatted);
             }
         };
+        this.idField.setMaxLength(64);
         if (questId != null) {
             this.idField.setText(questId);
             this.idField.setEditable(false);
@@ -164,6 +166,7 @@ public class EditQuestScreen extends Screen {
         // ROW 2: Title & Parents
         y += yStep;
         this.titleField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.title"));
+        this.titleField.setMaxLength(64);
         this.titleField.setText(initialTitle);
         this.titleField.setPlaceholder(Text.translatable("form.pacpack-quests.title_placeholder").formatted(Formatting.DARK_GRAY));
         this.addDrawableChild(this.titleField);
@@ -322,7 +325,7 @@ public class EditQuestScreen extends Screen {
         
 
         String finalId = this.idField.getText().trim();
-        if (finalId.isEmpty() || !finalId.matches("^[a-z0-9_]+$")) {
+        if (!PathSecurity.isValidIdentifier(finalId)) {
             this.errorMessage = "error.pacpack-quests.invalid_id";
             this.idField.setEditableColor(0xFFFF5555);
             return;
