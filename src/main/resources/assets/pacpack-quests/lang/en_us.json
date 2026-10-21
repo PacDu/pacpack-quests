@@ -10,9 +10,9 @@
   "error.pacpack-quests.unknown_parent": "One or more parent IDs do not exist!",
 
   "form.pacpack-quests.icon_item_id": "Icon",
-  "form.pacpack-quests.parents": "Parents IDs (Comma separated)",
-  "form.pacpack-quests.quest_id": "Quest ID",
-  "form.pacpack-quests.quest_id_placeholder": "my_first_quest",
+  "form.pacpack-quests.parents": "Parents Quests",
+  "form.pacpack-quests.quest_id": "Unique ID",
+  "form.pacpack-quests.quest_id_placeholder": "auto_generated",
   "form.pacpack-quests.required_amount": "Required Amount",
   "form.pacpack-quests.reward_amount": "Reward Amount",
   "form.pacpack-quests.reward_command": "Reward Command to Execute",

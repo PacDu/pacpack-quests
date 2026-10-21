@@ -10,9 +10,9 @@
   "error.pacpack-quests.unknown_parent": "Un ou plusieurs IDs parents n'existent pas !",
 
   "form.pacpack-quests.icon_item_id": "Icône",
-  "form.pacpack-quests.parents": "IDs des Parents (Séparés d'une virgule)",
-  "form.pacpack-quests.quest_id": "ID de la Quête",
-  "form.pacpack-quests.quest_id_placeholder": "ma_premiere_quete",
+  "form.pacpack-quests.parents": "Quêtes Parentes",
+  "form.pacpack-quests.quest_id": "Identifiant Unique",
+  "form.pacpack-quests.quest_id_placeholder": "genere_automatiquement",
   "form.pacpack-quests.required_amount": "Quantité Requise",
   "form.pacpack-quests.reward_amount": "Quantité de Récompense",
   "form.pacpack-quests.reward_command": "Commande Exécutée à la Récompense",

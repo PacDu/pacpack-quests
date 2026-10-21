@@ -102,14 +102,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		this.inlineCategoryField = new TextFieldWidget(this.textRenderer, startX - tabWidth, 0, tabWidth, tabHeight, Text.empty()) {
 			@Override
 			public void write(String text) {
-				String formatted = text.toLowerCase(Locale.ROOT)
-						.replace("œ", "oe")
-						.replace("æ", "ae");
-				formatted = Normalizer.normalize(formatted, Normalizer.Form.NFD)
-						.replaceAll("\\p{M}", "")
-						.replace(' ', '_')
-						.replaceAll("[^a-z0-9_]", "");
-				super.write(formatted);
+				super.write(PathSecurity.formatStringToValidPath(text));
 			}
 		};
 		this.inlineCategoryField.setMaxLength(10);

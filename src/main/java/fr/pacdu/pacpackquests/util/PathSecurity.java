@@ -3,6 +3,7 @@ package fr.pacdu.pacpackquests.util;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -86,5 +87,25 @@ public final class PathSecurity {
             return Optional.empty();
         }
         return Optional.of(questFile);
+    }
+
+    /**
+     * Format a string to be valid as a path :
+     *  remove accents,
+     *  replace spaces with underscores,
+     *  remove any character other than 'a' to 'z', '0' to '9' or '_',
+     *  if the result equals to a reserved Windows device name, add an extra underscore at the end.
+     * @param str The string to format.
+     * @return the formatted string.
+     */
+    public static String formatStringToValidPath(String str) {
+        String formatted = str.toLowerCase(Locale.ROOT)
+                .replace("œ", "oe")
+                .replace("æ", "ae");
+        formatted = Normalizer.normalize(formatted, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace(' ', '_')
+                .replaceAll("[^a-z0-9_]", "");
+        return formatted;
     }
 }

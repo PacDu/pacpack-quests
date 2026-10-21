@@ -26,10 +26,8 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 
 import static fr.pacdu.pacpackquests.client.util.TranslationUtils.*;
@@ -47,6 +45,7 @@ public class EditQuestScreen extends Screen {
     // Selection Buttons
     private ButtonWidget targetButton, iconButton, parentsButton, rewardButton, taskTypeButton, rewardTypeButton;
 
+    // Dropdown
     private boolean isTaskDropdownOpen = false;
     private boolean isRewardDropdownOpen = false;
     private final ScrollbarWidget dropdownScrollbar = new ScrollbarWidget(0, 0, 6, 0, 1, true);
@@ -63,8 +62,9 @@ public class EditQuestScreen extends Screen {
     private String initialReward = "";
     private String errorMessage = null;
     private List<String> selectedParents = new ArrayList<>();
-    private boolean isInitialized = false;
     private QuestDefinition duplicatedQuest = null;
+    private boolean isInitialized = false;
+    private boolean isIdManuallyEdited = false;
 
     public EditQuestScreen(QuestScreen parent, String questId, String category, int gridX, int gridY) {
         super(Text.literal(questId == null ? I18n.translate("gui.pacpack-quests.create_new_quest") : I18n.translate("gui.pacpack-quests.edit_quest")));
@@ -100,6 +100,7 @@ public class EditQuestScreen extends Screen {
 
         // 1. Load data from memory if we are editing a quest
         if ((questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) || duplicatedQuest != null) {
+            this.isIdManuallyEdited = true; // Set the ID label to white
             QuestDefinition def = duplicatedQuest != null ? duplicatedQuest : PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
             initialTitle = def.title();
             
@@ -130,30 +131,12 @@ public class EditQuestScreen extends Screen {
         if (this.rewardAmountField != null) initialRewAmt = this.rewardAmountField.getText();
         if (this.selectedParents != null) initialParents = String.join(",", this.selectedParents);
 
-        // ROW 1: ID & Icon Button
-        this.idField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.quest_id")) {
-            @Override
-            public void write(String text) {
-                String formatted = text.toLowerCase(Locale.ROOT)
-                        .replace("œ", "oe")
-                        .replace("æ", "ae");
-                formatted = Normalizer.normalize(formatted, Normalizer.Form.NFD)
-                        .replaceAll("\\p{M}", "")
-                        .replace(' ', '_')
-                        .replaceAll("[^a-z0-9_]", "");
-                super.write(formatted);
-            }
-        };
-        this.idField.setMaxLength(64);
-        if (questId != null) {
-            this.idField.setText(questId);
-            this.idField.setEditable(false);
-        } else {
-            // Restore the ID typed during the creation of a new quest or the duplication of another one
-            this.idField.setText(currentId);
-            this.idField.setPlaceholder(Text.translatable("form.pacpack-quests.quest_id_placeholder").formatted(Formatting.DARK_GRAY));
-        }
-        this.addDrawableChild(this.idField);
+        // ROW 1: Title & Icon Button
+        this.titleField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.title"));
+        this.titleField.setMaxLength(64);
+        this.titleField.setText(initialTitle);
+        this.titleField.setPlaceholder(Text.translatable("form.pacpack-quests.title_placeholder").formatted(Formatting.DARK_GRAY));
+        this.addDrawableChild(this.titleField);
 
         this.iconButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(selectedIcon, RegistryType.ITEM))), button -> {
             this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
@@ -163,13 +146,39 @@ public class EditQuestScreen extends Screen {
         }).dimensions(col2, y, fieldWidth, fieldHeight).build();
         this.addDrawableChild(this.iconButton);
 
-        // ROW 2: Title & Parents
+        // ROW 2: ID & Parents
         y += yStep;
-        this.titleField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.title"));
-        this.titleField.setMaxLength(64);
-        this.titleField.setText(initialTitle);
-        this.titleField.setPlaceholder(Text.translatable("form.pacpack-quests.title_placeholder").formatted(Formatting.DARK_GRAY));
-        this.addDrawableChild(this.titleField);
+        this.idField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.quest_id")) {
+            @Override
+            public void write(String text) {
+                super.write(PathSecurity.formatStringToValidPath(text));
+            }
+        };
+        this.idField.setMaxLength(64);
+        this.idField.setEditableColor(0xFF707070);
+        if (questId != null) {
+            this.idField.setText(questId);
+            this.idField.setEditable(false);
+            this.idField.active = false;
+        } else {
+            // Restore the ID typed during the creation of a new quest or the duplication of another one
+            this.idField.setText(currentId);
+            this.idField.setPlaceholder(Text.translatable("form.pacpack-quests.quest_id_placeholder").formatted(Formatting.DARK_GRAY));
+
+            // Change color if edited
+            this.idField.setChangedListener(newId -> {
+                if (!this.isIdManuallyEdited && this.idField.isFocused() && !newId.equals(PathSecurity.formatStringToValidPath(this.titleField.getText()))) {
+                    this.idField.setEditableColor(0xFFE0E0E0);
+                    this.isIdManuallyEdited = true;
+                }
+            });
+
+            // Add a listener to dynamically change the ID according to the title
+            this.titleField.setChangedListener(newTitle -> {
+                if (!isIdManuallyEdited) this.idField.setText(PathSecurity.formatStringToValidPath(newTitle));
+            });
+        }
+        this.addDrawableChild(this.idField);
 
         this.parentsButton = ButtonWidget.builder(Text.literal(initialParents.isEmpty() ? "None" : initialParents.split(",").length + " parents"), button -> {
             this.client.setScreen(new ParentSelectionScreen(this, this.idField.getText(), this.category, this.selectedParents, this.titleField.getText(), this.gridX, this.gridY, this.selectedIcon));
@@ -177,7 +186,7 @@ public class EditQuestScreen extends Screen {
         this.addDrawableChild(this.parentsButton);
 
         // ROW 3: Task Type & Reward Type Toggles
-        y += yStep - 10;
+        y += yStep - 8;
         this.taskTypeButton = ButtonWidget.builder(
                 Text.translatable("form.pacpack-quests.task_type").append(Text.literal(": ")).append(Text.translatable("task.pacpack-quests." + currentTaskType.name().toLowerCase())),
                 button -> {
@@ -246,6 +255,7 @@ public class EditQuestScreen extends Screen {
         this.reqAmountField.setTextPredicate(text -> text.matches("^[0-9]*$"));
         this.reqAmountField.setText(initialReqAmt);
         this.reqAmountField.setEditable(this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME);
+        this.reqAmountField.active = this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME;
         this.addDrawableChild(this.reqAmountField);
 
         this.rewardAmountField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.reward_amount"));
@@ -265,7 +275,7 @@ public class EditQuestScreen extends Screen {
             this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.pacpack-quests.delete").formatted(Formatting.RED), button -> {
                 ClientPlayNetworking.send(new DeleteQuestPayload(questId));
                 this.client.setScreen(parent);
-            }).dimensions(this.width / 2 + 55, y, 50, fieldHeight).build());
+            }).dimensions(this.width / 2 + 55, y, 60, fieldHeight).build());
         }
 
         this.duplicatedQuest = null;
@@ -496,6 +506,7 @@ public class EditQuestScreen extends Screen {
         this.currentTaskType = type;
         this.taskTypeButton.setMessage(Text.literal(I18n.translate("form.pacpack-quests.task_type") + ": " + I18n.translate("task.pacpack-quests." + type.name().toLowerCase())));
         this.reqAmountField.setEditable(type != TaskType.EXPLORE_DIMENSION && type != TaskType.EXPLORE_BIOME);
+        this.reqAmountField.active = this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME;
 
         if (type == TaskType.EXPLORE_DIMENSION || type == TaskType.EXPLORE_BIOME) {
             this.reqAmountField.setText("1");
@@ -534,8 +545,8 @@ public class EditQuestScreen extends Screen {
         super.render(context, mouseX, mouseY, delta);
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 10, 0xFFFFFFFF);
 
-        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.quest_id"), this.idField.getX(), this.idField.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.title"), this.titleField.getX(), this.titleField.getY() - 10, 0xFFFFFFFF, true);
+        context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.quest_id"), this.idField.getX(), this.idField.getY() - 10, this.isIdManuallyEdited ? 0xFFFFFFFF : 0xFFBBBBBB, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.icon_item_id"), this.iconButton.getX(), this.iconButton.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.task_target"), this.targetButton.getX(), this.targetButton.getY() - 10, 0xFFFFFFFF, true);
 
