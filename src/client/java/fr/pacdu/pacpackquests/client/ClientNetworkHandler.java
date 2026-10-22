@@ -5,6 +5,7 @@ import fr.pacdu.pacpackquests.client.screen.QuestScreen;
 import fr.pacdu.pacpackquests.client.screen.SelectionScreen;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.*;
+import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.item.Item;
@@ -20,10 +21,12 @@ public class ClientNetworkHandler {
 
     public static void register() {
         ClientPlayNetworking.registerGlobalReceiver(QuestSyncPayload.ID, (payload, context) -> context.client().execute(() -> {
-            Item icon = Registries.ITEM.get(Identifier.of(payload.iconId()));
+            var client = context.client();
+            var registries = client.world != null ? client.world.getRegistryManager() : (client.getServer() != null ? client.getServer().getRegistryManager() : null);
+            ItemStack icon = ItemUtils.fromCommandString(payload.iconId(), registries);
             QuestDefinition def = new QuestDefinition(
                     payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
-                    payload.requiredAmount(), new ItemStack(icon), payload.reward(), payload.rewardType(),
+                    payload.requiredAmount(), icon, payload.reward(), payload.rewardType(),
                     payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
             );
             PacPackQuestsClient.CLIENT_DEFINITIONS.put(payload.questId(), def);
@@ -123,10 +126,10 @@ public class ClientNetworkHandler {
                 if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.STRUCTURE) {
                     screen.refreshEntries(PacPackQuestsClient.SERVER_STRUCTURES);
                 }
-            } else if (payload.type() == RegistryType.LOOT_TABLE) {
+            } else if (payload.type() == RegistryType.LOOTABLE) {
                 PacPackQuestsClient.SERVER_LOOT_TABLES.clear();
                 PacPackQuestsClient.SERVER_LOOT_TABLES.addAll(payload.entries());
-                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.LOOT_TABLE) {
+                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.LOOTABLE) {
                     screen.refreshEntries(PacPackQuestsClient.SERVER_LOOT_TABLES);
                 }
             }

@@ -149,6 +149,8 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				));
 			}
 		}
+
+		this.clampPanning();
 	}
 
 	@Override
@@ -427,7 +429,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			// Task target (e.g., Craft: Shield)
 			tooltip.add(Text.translatable("gui.pacpack-quests." + quest.taskType().toString().toLowerCase())
 					.append(": ")
-					.append(Text.literal(getTranslatedTargetName(quest.target())))
+					.append(Text.literal(TranslationUtils.getTranslatedName(quest.target(), TaskType.getRegistryType(quest.taskType))))
 					.formatted(Formatting.GRAY));
 
 			// Progress (e.g., Progress: 0 / 1)
@@ -806,35 +808,6 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 
 		return bestPos;
-	}
-
-	private String getTranslatedTargetName(String target) {
-		if (target.startsWith("#")) {
-			String tagKey = "tag." + target.substring(1).replace(":", ".");
-			if (I18n.hasTranslation(tagKey)) {
-				return I18n.translate(tagKey);
-			} else {
-				String path = Identifier.of(target.substring(1)).getPath();
-				String formatted = path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
-				return "Any " + formatted;
-			}
-		} else {
-			Identifier id = Identifier.of(target);
-
-			// If it's an Item
-			if (Registries.ITEM.containsId(id)) {
-				return Registries.ITEM.get(id).getName().getString();
-			}
-			// If it's a Mob
-			else if (Registries.ENTITY_TYPE.containsId(id)) {
-				return Registries.ENTITY_TYPE.get(id).getName().getString();
-			}
-			// If it's a Biome, Dimension or Structure
-			else {
-				String path = id.getPath();
-				return path.substring(0, 1).toUpperCase() + path.substring(1).replace("_", " ");
-			}
-		}
 	}
 
 	@Override

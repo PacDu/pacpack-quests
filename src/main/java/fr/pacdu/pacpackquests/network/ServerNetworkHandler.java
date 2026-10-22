@@ -8,12 +8,11 @@ import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestState;
+import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import fr.pacdu.pacpackquests.util.RewardUtils;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -86,7 +85,7 @@ public class ServerNetworkHandler {
                     QuestSyncPayload syncPacket = new QuestSyncPayload(
                             newDef.id(), newDef.title(), newDef.category(), newDef.taskType(),
                             newDef.target(), newDef.requiredAmount(),
-                            Registries.ITEM.getId(newDef.icon().getItem()).toString(),
+                            ItemUtils.toCommandString(newDef.icon(), context.server().getRegistryManager()),
                             newDef.reward(),
                             newDef.rewardType(), newDef.rewardAmount(), newDef.parents(),
                             payload.newX(), payload.newY()
@@ -128,7 +127,7 @@ public class ServerNetworkHandler {
             switch (payload.rewardType()) {
                 case XP -> json.addProperty("reward", "xp");
                 case LEVEL -> json.addProperty("reward", "level");
-                case ITEM, ENCHANTED_BOOK, COMMAND -> json.addProperty("reward", payload.reward());
+                case ITEM, COMMAND -> json.addProperty("reward", payload.reward());
             }
             json.addProperty("rewardAmount", payload.rewardAmount());
 
@@ -144,7 +143,7 @@ public class ServerNetworkHandler {
 
                 QuestDefinition newDef = new QuestDefinition(
                         payload.questId(), payload.title(), payload.category(), payload.taskType(), payload.target(),
-                        payload.requiredAmount(), new ItemStack(Registries.ITEM.get(Identifier.of(payload.iconId()))),
+                        payload.requiredAmount(), ItemUtils.fromCommandString(payload.iconId(), context.server().getRegistryManager()),
                         payload.reward(), payload.rewardType(),
                         payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
                 );
@@ -268,7 +267,7 @@ public class ServerNetworkHandler {
                 var registry = context.server().getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
                 registry.getIds().forEach(id -> entries.add(id.toString()));
                 registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> entries.add("#" + key.id().toString())));
-            } else if (payload.type() == RegistryType.LOOT_TABLE) {
+            } else if (payload.type() == RegistryType.LOOTABLE) {
                 entries.add("#pacpackquests:loot_chest");
                 var opt = context.server().getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
                 opt.ifPresent(lootTableImpl -> lootTableImpl.streamKeys().forEach(key -> {

@@ -7,6 +7,7 @@ import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
 import fr.pacdu.pacpackquests.network.DeleteQuestPayload;
 import fr.pacdu.pacpackquests.network.SaveQuestPayload;
+import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -103,14 +104,14 @@ public class EditQuestScreen extends Screen {
             this.isIdManuallyEdited = true; // Set the ID label to white
             QuestDefinition def = duplicatedQuest != null ? duplicatedQuest : PacPackQuestsClient.CLIENT_DEFINITIONS.get(questId);
             initialTitle = def.title();
-            
+
             if (!this.isInitialized) {
                 this.currentTaskType = def.taskType();
                 this.currentRewardType = def.rewardType();
             }
 
             // Only update these variables if they are empty (to avoid overwriting SelectionScreen callbacks)
-            if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = Registries.ITEM.getId(def.icon().getItem()).toString();
+            if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = ItemUtils.toCommandString(def.icon());
             if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
             if (this.selectedReward == null || this.selectedReward.equals("minecraft:diamond")) {
                 this.selectedReward = def.reward();
@@ -213,19 +214,11 @@ public class EditQuestScreen extends Screen {
 
         // ROW 4: Target Button & Reward Button
         y += yStep;
-        this.targetButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(selectedTarget, RegistryType.ITEM))), button -> {
-            RegistryType ctx = switch (currentTaskType) {
-                case MINE_BLOCK -> RegistryType.BLOCK;
-                case CRAFT_ITEM, OBTAIN_ITEM -> RegistryType.ITEM;
-                case KILL_MOB -> RegistryType.MOB;
-                case EXPLORE_BIOME -> RegistryType.BIOME;
-                case EXPLORE_STRUCTURE -> RegistryType.STRUCTURE;
-                case EXPLORE_DIMENSION -> RegistryType.DIMENSION;
-                case OPEN_LOOT_CHEST -> RegistryType.LOOT_TABLE;
-            };
+        this.targetButton = ButtonWidget.builder(Text.literal(formatDisplayString(getTranslatedName(selectedTarget, getTargetRegistryType()))), button -> {
+            RegistryType ctx = getTargetRegistryType();
             this.client.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedTarget = result;
-                this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
+                this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, ctx))));
             }));
         }).dimensions(col1, y, fieldWidth, fieldHeight).build();
         this.addDrawableChild(this.targetButton);
@@ -238,8 +231,7 @@ public class EditQuestScreen extends Screen {
                     updateRewardButtonMessage();
                 }));
             } else {
-                RegistryType ctx = (currentRewardType == RewardType.ENCHANTED_BOOK) ? RegistryType.ENCHANTMENT : RegistryType.ITEM;
-                this.client.setScreen(new SelectionScreen(this, ctx, result -> {
+                this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
                     this.selectedReward = result;
                     updateRewardButtonMessage();
                 }, true, true));
@@ -281,11 +273,22 @@ public class EditQuestScreen extends Screen {
         this.duplicatedQuest = null;
     }
 
+    private RegistryType getTargetRegistryType() {
+        return switch (currentTaskType) {
+            case MINE_BLOCK -> RegistryType.BLOCK;
+            case CRAFT_ITEM, OBTAIN_ITEM -> RegistryType.ITEM;
+            case KILL_MOB -> RegistryType.MOB;
+            case EXPLORE_BIOME -> RegistryType.BIOME;
+            case EXPLORE_STRUCTURE -> RegistryType.STRUCTURE;
+            case EXPLORE_DIMENSION -> RegistryType.DIMENSION;
+            case OPEN_LOOT_CHEST -> RegistryType.LOOTABLE;
+        };
+    }
+
     private void updateRewardButtonMessage() {
         if (this.rewardButton == null) return;
         RegistryType ctx = switch (currentRewardType) {
             case ITEM -> RegistryType.ITEM;
-            case ENCHANTED_BOOK -> RegistryType.ENCHANTMENT;
             case COMMAND -> RegistryType.COMMAND;
             case XP, LEVEL -> null;
         };
@@ -307,8 +310,16 @@ public class EditQuestScreen extends Screen {
                 case OPEN_LOOT_CHEST -> target.equals("#pacpackquests:loot_chest");
             };
         }
+
+        if (target.contains("[")) {
+            String baseId = target.substring(0, target.indexOf('['));
+            Identifier id = Identifier.tryParse(baseId);
+            return id != null && (type == TaskType.CRAFT_ITEM || type == TaskType.OBTAIN_ITEM) && Registries.ITEM.containsId(id);
+        }
+
         Identifier id = Identifier.tryParse(target);
         if (id == null) return false;
+
         return switch (type) {
             case MINE_BLOCK -> Registries.BLOCK.containsId(id);
             case CRAFT_ITEM, OBTAIN_ITEM -> Registries.ITEM.containsId(id);
@@ -321,7 +332,13 @@ public class EditQuestScreen extends Screen {
             }
             case OPEN_LOOT_CHEST -> {
                 var server = MinecraftClient.getInstance().getServer();
-                if (server == null) yield true; var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE); if (opt.isPresent()) { var key = net.minecraft.registry.RegistryKey.of(RegistryKeys.LOOT_TABLE, id); yield opt.get().getOptional(key).isPresent(); } yield false;
+                if (server == null) yield true;
+                var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
+                if (opt.isPresent()) {
+                    var key = net.minecraft.registry.RegistryKey.of(RegistryKeys.LOOT_TABLE, id);
+                    yield opt.get().getOptional(key).isPresent();
+                }
+                yield false;
             }
         };
     }
@@ -332,7 +349,6 @@ public class EditQuestScreen extends Screen {
         this.titleField.setEditableColor(0xFFE0E0E0);
         this.reqAmountField.setEditableColor(0xFFE0E0E0);
         this.rewardAmountField.setEditableColor(0xFFE0E0E0);
-        
 
         String finalId = this.idField.getText().trim();
         if (!PathSecurity.isValidIdentifier(finalId)) {
@@ -340,6 +356,7 @@ public class EditQuestScreen extends Screen {
             this.idField.setEditableColor(0xFFFF5555);
             return;
         }
+
         if (this.questId == null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(finalId)) {
             this.errorMessage = "error.pacpack-quests.id_already_exists";
             this.idField.setEditableColor(0xFFFF5555);
@@ -352,7 +369,8 @@ public class EditQuestScreen extends Screen {
             return;
         }
 
-        if (this.selectedIcon.isEmpty() || Identifier.tryParse(this.selectedIcon) == null) {
+        String icon = this.selectedIcon.indexOf('[') >= 0 ? this.selectedIcon.substring(0, this.selectedIcon.indexOf('[')) : this.selectedIcon;
+        if (this.selectedIcon.isEmpty() || Identifier.tryParse(icon) == null) {
             this.errorMessage = "error.pacpack-quests.invalid_icon";
             return;
         }
@@ -377,11 +395,6 @@ public class EditQuestScreen extends Screen {
             return;
         }
 
-        if (this.currentRewardType == RewardType.ENCHANTED_BOOK && (this.selectedReward.isEmpty() || !this.selectedReward.startsWith("enchanted_book:"))) {
-            this.errorMessage = "error.pacpack-quests.invalid_reward_item";
-            return;
-        }
-
         String finalRewardStr = (currentRewardType != RewardType.XP && currentRewardType != RewardType.LEVEL) ? this.selectedReward : "minecraft:air";
 
         int rewAmt;
@@ -401,12 +414,10 @@ public class EditQuestScreen extends Screen {
                 String parentId = p.trim();
                 if (parentId.equals(finalId)) {
                     this.errorMessage = "error.pacpack-quests.self_parent";
-                    
                     return;
                 }
                 if (!PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(parentId)) {
                     this.errorMessage = "error.pacpack-quests.unknown_parent";
-                    
                     return;
                 }
                 parentsList.add(parentId);
@@ -467,7 +478,7 @@ public class EditQuestScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyInput input) {
-        if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)  {
+        if (input.getKeycode() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
             this.client.setScreen(parent);
             return true;
         }
@@ -522,7 +533,7 @@ public class EditQuestScreen extends Screen {
             case OPEN_LOOT_CHEST -> "#pacpackquests:loot_chests";
         };
 
-        this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(this.selectedTarget, RegistryType.ITEM))));
+        this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(this.selectedTarget, getTargetRegistryType()))));
     }
 
     private void selectRewardType(RewardType type) {
@@ -532,7 +543,6 @@ public class EditQuestScreen extends Screen {
 
         this.selectedReward = switch (type) {
             case ITEM -> "minecraft:diamond";
-            case ENCHANTED_BOOK -> "enchanted_book:minecraft:protection:1";
             case COMMAND -> "";
             default -> this.selectedReward;
         };
@@ -550,7 +560,7 @@ public class EditQuestScreen extends Screen {
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.icon_item_id"), this.iconButton.getX(), this.iconButton.getY() - 10, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.task_target"), this.targetButton.getX(), this.targetButton.getY() - 10, 0xFFFFFFFF, true);
 
-        if (this.currentRewardType == RewardType.ITEM || this.currentRewardType == RewardType.ENCHANTED_BOOK)
+        if (this.currentRewardType == RewardType.ITEM)
             context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_item"), this.rewardButton.getX(), this.rewardButton.getY() - 10, 0xFFFFFFFF, true);
         else if (this.currentRewardType == RewardType.COMMAND)
             context.drawText(this.textRenderer, Text.translatable("form.pacpack-quests.reward_command"), this.rewardButton.getX(), this.rewardButton.getY() - 10, 0xFFFFFFFF, true);
@@ -573,7 +583,7 @@ public class EditQuestScreen extends Screen {
         }
     }
 
-    private <E extends Enum<E>>  void drawDropdownMenu(DrawContext context, int mouseX, int mouseY, ButtonWidget button, E[] values, String type) {
+    private <E extends Enum<E>> void drawDropdownMenu(DrawContext context, int mouseX, int mouseY, ButtonWidget button, E[] values, String type) {
         int dropX = button.getX();
         int dropY = button.getY() + button.getHeight();
         int dropWidth = button.getWidth();

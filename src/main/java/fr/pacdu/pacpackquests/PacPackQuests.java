@@ -5,6 +5,7 @@ import fr.pacdu.pacpackquests.data.QuestEventHandler;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestState;
 import fr.pacdu.pacpackquests.network.*;
+import fr.pacdu.pacpackquests.util.ItemUtils;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -73,7 +74,7 @@ public class PacPackQuests implements ModInitializer {
 						quest.taskType(),
 						quest.target(),
 						quest.requiredAmount(),
-						Registries.ITEM.getId(quest.icon().getItem()).toString(),
+						ItemUtils.toCommandString(quest.icon(), server.getRegistryManager()),
 						quest.reward(),
 						quest.rewardType(),
 						quest.rewardAmount(),

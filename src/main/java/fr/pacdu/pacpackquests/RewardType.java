@@ -10,7 +10,6 @@ public enum RewardType {
     ITEM,
     XP,
     LEVEL,
-    ENCHANTED_BOOK,
     COMMAND;
 
     // Caching values at startup

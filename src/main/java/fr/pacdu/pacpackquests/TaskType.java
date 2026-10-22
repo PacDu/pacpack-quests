@@ -1,5 +1,7 @@
 package fr.pacdu.pacpackquests;
 
+import fr.pacdu.pacpackquests.util.RegistryType;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,5 +30,17 @@ public enum TaskType {
 
     public static boolean isValid(String name) {
         return name != null && TASK_TYPE_MAP.containsKey(name);
+    }
+
+    public static RegistryType getRegistryType(TaskType type) {
+        return switch (type) {
+            case MINE_BLOCK -> RegistryType.BLOCK;
+            case KILL_MOB -> RegistryType.MOB;
+            case CRAFT_ITEM, OBTAIN_ITEM -> RegistryType.ITEM;
+            case EXPLORE_BIOME -> RegistryType.BIOME;
+            case EXPLORE_STRUCTURE -> RegistryType.STRUCTURE;
+            case EXPLORE_DIMENSION -> RegistryType.DIMENSION;
+            case OPEN_LOOT_CHEST -> RegistryType.LOOTABLE;
+        };
     }
 }

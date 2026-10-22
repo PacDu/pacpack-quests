@@ -25,13 +25,14 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
+import fr.pacdu.pacpackquests.util.ItemUtils;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 public class QuestEventHandler {
 
-    private static final Map<UUID, Map<Identifier, Integer>> previousTickInventory = new HashMap<>();
+    private static final Map<UUID, Map<String, Integer>> previousTickInventory = new HashMap<>();
 
     private QuestEventHandler() {}
 
@@ -114,19 +115,19 @@ public class QuestEventHandler {
                 var world = player.getEntityWorld();
                 var registryManager = world.getRegistryManager();
 
-                Map<Identifier, Integer> currentInv = new HashMap<>();
+                Map<String, Integer> currentInv = new HashMap<>();
                 for (int i = 0; i < player.getInventory().size(); i++) {
                     ItemStack stack = player.getInventory().getStack(i);
                     if (!stack.isEmpty()) {
-                        Identifier id = Registries.ITEM.getId(stack.getItem());
-                        currentInv.put(id, currentInv.getOrDefault(id, 0) + stack.getCount());
+                        String itemKey = ItemUtils.toCommandString(stack, registryManager);
+                        currentInv.put(itemKey, currentInv.getOrDefault(itemKey, 0) + stack.getCount());
                     }
                 }
 
-                Map<Identifier, Integer> prevInv = previousTickInventory.computeIfAbsent(player.getUuid(), k -> new HashMap<>());
-                Map<Identifier, Integer> gainedItems = new HashMap<>();
+                Map<String, Integer> prevInv = previousTickInventory.computeIfAbsent(player.getUuid(), k -> new HashMap<>());
+                Map<String, Integer> gainedItems = new HashMap<>();
 
-                for (Map.Entry<Identifier, Integer> entry : currentInv.entrySet()) {
+                for (Map.Entry<String, Integer> entry : currentInv.entrySet()) {
                     int current = entry.getValue();
                     int previous = prevInv.getOrDefault(entry.getKey(), 0);
                     if (current > previous) {
@@ -138,30 +139,29 @@ public class QuestEventHandler {
                 for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
                     boolean requirementMet = false;
                     String target = quest.target();
+
+                    if (quest.taskType() == TaskType.OBTAIN_ITEM) {
+                        if (!gainedItems.isEmpty()) {
+                            int gained = 0;
+                            for (Map.Entry<String, Integer> gainedEntry : gainedItems.entrySet()) {
+                                ItemStack gainedStack = ItemUtils.fromCommandString(gainedEntry.getKey(), registryManager);
+                                if (ItemUtils.matches(gainedStack, target, registryManager)) {
+                                    gained += gainedEntry.getValue();
+                                }
+                            }
+                            if (gained > 0) {
+                                QuestProgressHandler.incrementProgress(player, quest, gained);
+                            }
+                        }
+                        continue;
+                    }
+
                     boolean isTag = target.startsWith("#");
                     Identifier targetId = Identifier.tryParse(isTag ? target.substring(1) : target);
 
                     if (targetId == null) continue;
 
                     switch (quest.taskType()) {
-                        case OBTAIN_ITEM -> {
-                            if (!gainedItems.isEmpty()) {
-                                int gained = 0;
-                                if (isTag) {
-                                    TagKey<net.minecraft.item.Item> tagKey = TagKey.of(RegistryKeys.ITEM, targetId);
-                                    for (Map.Entry<Identifier, Integer> entry : gainedItems.entrySet()) {
-                                        if (Registries.ITEM.get(entry.getKey()).getDefaultStack().isIn(tagKey)) {
-                                            gained += entry.getValue();
-                                        }
-                                    }
-                                } else {
-                                    gained = gainedItems.getOrDefault(targetId, 0);
-                                }
-                                if (gained > 0) {
-                                    QuestProgressHandler.incrementProgress(player, quest, gained);
-                                }
-                            }
-                        }
                         case EXPLORE_DIMENSION -> {
                             if (world.getRegistryKey().getValue().equals(targetId)) {
                                 requirementMet = true;

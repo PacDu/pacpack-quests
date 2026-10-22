@@ -37,6 +37,10 @@ public class IconUtils {
     private static Item computeRepresentativeItem(String target, RegistryType type) {
         boolean isTag = target.startsWith("#");
         String rawTarget = isTag ? target.substring(1) : target;
+        if (rawTarget.contains("[")) {
+            rawTarget = rawTarget.substring(0, rawTarget.indexOf('['));
+        }
+
         Identifier id = Identifier.tryParse(rawTarget);
 
         if (id == null) return getDefaultFallback(type);
@@ -121,7 +125,7 @@ public class IconUtils {
         return switch (type) {
             case DIMENSION -> Items.OBSIDIAN;
             case BIOME -> Items.GRASS_BLOCK;
-            case STRUCTURE, LOOT_TABLE -> Items.CHEST;
+            case STRUCTURE, LOOTABLE -> Items.CHEST;
             default -> Items.BARRIER;
         };
     }

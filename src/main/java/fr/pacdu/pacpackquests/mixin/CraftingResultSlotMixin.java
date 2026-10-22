@@ -4,15 +4,11 @@ import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestProgressHandler;
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.util.ItemUtils;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
 import net.minecraft.screen.slot.CraftingResultSlot;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -38,15 +34,7 @@ public class CraftingResultSlotMixin {
             for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
                 if (quest.taskType() == TaskType.CRAFT_ITEM) {
                     String target = quest.target().trim();
-                    boolean isTarget;
-
-                    if (target.startsWith("#")) {
-                        TagKey<Item> tag = TagKey.of(RegistryKeys.ITEM, Identifier.of(target.substring(1)));
-                        isTarget = stack.isIn(tag);
-                    } else {
-                        isTarget = Registries.ITEM.getId(stack.getItem()).toString().equals(target);
-                    }
-
+                    boolean isTarget = ItemUtils.matches(stack, target, serverPlayer.getEntityWorld().getRegistryManager());
                     if (isTarget) {
                         // “this.amount” contains the exact number of items selected (required for Shift-click)
                         QuestProgressHandler.incrementProgress(serverPlayer, quest, this.amount);

@@ -4,21 +4,14 @@ import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.data.RewardEntry;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnchantmentLevelEntry;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 import java.util.List;
@@ -28,62 +21,20 @@ public class RewardUtils {
     private RewardUtils() {}
 
     /**
-     * Creates an ItemStack representing the reward, preserving components like stored enchantments.
+     * Creates an ItemStack representing the reward, preserving components like stored enchantments or potion contents.
      * If the target is a tag (e.g. "#minecraft:logs"), returns the first item from the tag for representation.
      */
-    public static ItemStack createRewardStack(String rewardId, RewardType rewardType, DynamicRegistryManager registryManager) {
+    public static ItemStack createRewardStack(String rewardId, RewardType rewardType, RegistryWrapper.WrapperLookup registryManager) {
         if (rewardType == null) return ItemStack.EMPTY;
         return switch (rewardType) {
             case XP -> new ItemStack(Items.EXPERIENCE_BOTTLE);
             case LEVEL -> new ItemStack(Items.ENCHANTED_BOOK);
-            case ENCHANTED_BOOK -> createEnchantedBookStack(rewardId, registryManager);
             case ITEM -> {
                 if (rewardId == null) yield ItemStack.EMPTY;
-                if (rewardId.startsWith("#")) {
-                    Identifier tagId = Identifier.tryParse(rewardId.substring(1));
-                    yield tagId != null ? new ItemStack(TagUtils.getFirstItemInTag(tagId)) : ItemStack.EMPTY;
-                }
-                Identifier id = Identifier.tryParse(rewardId);
-                yield id != null && Registries.ITEM.containsId(id) ? new ItemStack(Registries.ITEM.get(id)) : ItemStack.EMPTY;
+                yield ItemUtils.fromCommandString(rewardId, registryManager);
             }
             case COMMAND -> new ItemStack(Items.WRITABLE_BOOK);
         };
-    }
-
-    /**
-     * Builds an enchanted book ItemStack for entry strings formatted as "enchanted_book:namespace:path:level".
-     */
-    public static ItemStack createEnchantedBookStack(String rewardId, DynamicRegistryManager registryManager) {
-        if (rewardId == null) {
-            return new ItemStack(Items.ENCHANTED_BOOK);
-        }
-
-        String cleanId = rewardId.startsWith("minecraft:enchanted_book:") ? rewardId.substring("minecraft:".length()) : rewardId;
-        if (!cleanId.startsWith("enchanted_book:")) {
-            return new ItemStack(Items.ENCHANTED_BOOK);
-        }
-
-        String[] parts = cleanId.split(":");
-        if (parts.length >= 4) {
-            Identifier enchId = Identifier.of(parts[1], parts[2]);
-            int level = 1;
-            try {
-                level = Integer.parseInt(parts[3]);
-            } catch (NumberFormatException ignored) {}
-
-            if (registryManager != null) {
-                var optReg = registryManager.getOptional(RegistryKeys.ENCHANTMENT);
-                if (optReg.isPresent()) {
-                    Registry<Enchantment> reg = optReg.get();
-                    Enchantment ench = reg.get(enchId);
-                    if (ench != null) {
-                        RegistryEntry<Enchantment> entry = reg.getEntry(ench);
-                        return EnchantmentHelper.getEnchantedBookWith(new EnchantmentLevelEntry(entry, level));
-                    }
-                }
-            }
-        }
-        return new ItemStack(Items.ENCHANTED_BOOK);
     }
 
     /**
@@ -96,22 +47,7 @@ public class RewardUtils {
     }
 
     /**
-     * Grants an individual RewardEntry to a server player.
-     */
-    public static void grantReward(ServerPlayerEntity player, RewardEntry entry, DynamicRegistryManager registryManager) {
-        if (entry != null) {
-            grantReward(player, entry.type(), entry.target(), entry.amount(), registryManager);
-        }
-    }
-
-    /**
-     * Grants a specific reward taskType, target, and amount to a server player.
-     * Supports:
-     * - XP points
-     * - Experience levels
-     * - Enchanted books with specific enchantments and levels
-     * - Fixed items
-     * - Item tags (picks a random item from the tag)
+     * Grants a specific reward type, target, and amount to a server player.
      */
     public static void grantReward(ServerPlayerEntity player, RewardType type, String target, int amount, DynamicRegistryManager registryManager) {
         if (type == null || player == null || amount <= 0) return;
@@ -120,14 +56,6 @@ public class RewardUtils {
             case XP -> player.addExperience(amount);
 
             case LEVEL -> player.addExperienceLevels(amount);
-
-            case ENCHANTED_BOOK -> {
-                ItemStack book = createEnchantedBookStack(target, registryManager);
-                if (!book.isEmpty()) {
-                    book.setCount(amount);
-                    giveItemStack(player, book);
-                }
-            }
 
             case ITEM -> {
                 if (target == null || target.isEmpty()) return;
@@ -145,26 +73,20 @@ public class RewardUtils {
                     }
                 }
 
-                // Regular item
-                Identifier id = Identifier.tryParse(target);
-                if (id != null && Registries.ITEM.containsId(id)) {
-                    giveItemStack(player, new ItemStack(Registries.ITEM.get(id), amount));
+                // Item with components or standard item
+                ItemStack rewardStack = ItemUtils.fromCommandString(target, registryManager);
+                if (!rewardStack.isEmpty()) {
+                    rewardStack.setCount(amount);
+                    giveItemStack(player, rewardStack);
                 }
             }
 
             case COMMAND -> {
                 if (target == null || target.isEmpty()) return;
 
-                // 1. Get the server (or use context.server() if inside a packet receiver)
                 MinecraftServer server = player.getCommandSource().getServer();
+                String cleanCommand = target.startsWith("/") ? target.substring(1) : target;
 
-                // 2. Remove the leading "/" if present (Brigadier does not want the slash)
-                String cleanCommand = target.startsWith("/")
-                        ? target.substring(1)
-                        : target;
-
-                // 3. Use the server's command source (already has OP permissions by default)
-                // and anchor it to the player's entity position, rotation and dimension
                 ServerCommandSource source = server.getCommandSource()
                         .withEntity(player)
                         .withPosition(player.getEntityPos())
@@ -172,14 +94,12 @@ public class RewardUtils {
                         .withWorld(player.getEntityWorld())
                         .withSilent();
 
-                // 4. Execute directly via Brigadier's dispatcher (version-independent API)
                 try {
                     for (int i = 0; i < amount; i++) {
                         server.getCommandManager().getDispatcher().execute(cleanCommand, source);
                     }
                 } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
-                    // Log an error if the modpack creator wrote an invalid command in the quest
-                    PacPackQuests.LOGGER.error("Failed to execute quest reward command: " + cleanCommand, e);
+                    PacPackQuests.LOGGER.error("Failed to execute quest reward command: {}", cleanCommand, e);
                 }
             }
         }

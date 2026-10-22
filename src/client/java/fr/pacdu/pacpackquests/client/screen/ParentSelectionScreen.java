@@ -1,6 +1,8 @@
 package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.util.ItemUtils;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.item.ItemStack;
@@ -60,7 +62,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
                 if (def.id().equals(this.questId)) foundSelf = true;
                 int nodeX = canvasOffsetX + (def.displayX() * gridSpacing) + 8;
                 int nodeY = canvasOffsetY + (def.displayY() * gridSpacing) + 8;
-                nodes.add(new SelectionNode(def.id(), def.title(), nodeX, nodeY, def.parents(), def.icon().getItem().getDefaultStack()));
+                nodes.add(new SelectionNode(def.id(), def.title(), nodeX, nodeY, def.parents(), def.icon().copy()));
             }
         }
 
@@ -69,9 +71,11 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
             int nodeY = canvasOffsetY + (this.tempY * gridSpacing) + 8;
             ItemStack iconStack = Items.STONE.getDefaultStack();
             if (this.tempIcon != null) {
-                Identifier id = Identifier.tryParse(this.tempIcon);
-                if (id != null && Registries.ITEM.containsId(id)) {
-                    iconStack = Registries.ITEM.get(id).getDefaultStack();
+                var world = MinecraftClient.getInstance().world;
+                var reg = world != null ? world.getRegistryManager() : null;
+                ItemStack parsed = ItemUtils.fromCommandString(this.tempIcon, reg);
+                if (!parsed.isEmpty()) {
+                    iconStack = parsed;
                 }
             }
             nodes.add(new SelectionNode(this.questId, this.tempTitle != null && !this.tempTitle.trim().isEmpty() ? this.tempTitle : this.questId, nodeX, nodeY, this.selectedParents, iconStack));
