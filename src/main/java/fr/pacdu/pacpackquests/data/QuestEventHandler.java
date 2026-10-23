@@ -115,43 +115,22 @@ public class QuestEventHandler {
                 var world = player.getEntityWorld();
                 var registryManager = world.getRegistryManager();
 
-                Map<String, Integer> currentInv = new HashMap<>();
-                for (int i = 0; i < player.getInventory().size(); i++) {
-                    ItemStack stack = player.getInventory().getStack(i);
-                    if (!stack.isEmpty()) {
-                        String itemKey = ItemUtils.toCommandString(stack, registryManager);
-                        currentInv.put(itemKey, currentInv.getOrDefault(itemKey, 0) + stack.getCount());
-                    }
-                }
-
-                Map<String, Integer> prevInv = previousTickInventory.computeIfAbsent(player.getUuid(), k -> new HashMap<>());
-                Map<String, Integer> gainedItems = new HashMap<>();
-
-                for (Map.Entry<String, Integer> entry : currentInv.entrySet()) {
-                    int current = entry.getValue();
-                    int previous = prevInv.getOrDefault(entry.getKey(), 0);
-                    if (current > previous) {
-                        gainedItems.put(entry.getKey(), current - previous);
-                    }
-                }
-                previousTickInventory.put(player.getUuid(), currentInv);
-
                 for (QuestDefinition quest : QuestManager.LOADED_QUESTS.values()) {
                     boolean requirementMet = false;
                     String target = quest.target();
 
                     if (quest.taskType() == TaskType.OBTAIN_ITEM) {
-                        if (!gainedItems.isEmpty()) {
-                            int gained = 0;
-                            for (Map.Entry<String, Integer> gainedEntry : gainedItems.entrySet()) {
-                                ItemStack gainedStack = ItemUtils.fromCommandString(gainedEntry.getKey(), registryManager);
-                                if (ItemUtils.matches(gainedStack, target, registryManager)) {
-                                    gained += gainedEntry.getValue();
+                        int targetItemCount = 0;
+                        for (int i = 0; i < player.getInventory().size(); i++) {
+                            ItemStack stack = player.getInventory().getStack(i);
+                            if (!stack.isEmpty()) {
+                                if (ItemUtils.matches(stack, target, registryManager)) {
+                                    targetItemCount += stack.getCount();
                                 }
                             }
-                            if (gained > 0) {
-                                QuestProgressHandler.incrementProgress(player, quest, gained);
-                            }
+                        }
+                        if (targetItemCount > 0) {
+                            QuestProgressHandler.setProgress(player, quest, targetItemCount);
                         }
                         continue;
                     }

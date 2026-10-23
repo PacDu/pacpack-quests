@@ -11,8 +11,16 @@ import java.util.UUID;
 
 public class QuestProgressHandler {
 
-    // Generic method to safely increment progress and sync it with the client
     public static void incrementProgress(ServerPlayerEntity player, QuestDefinition quest, int amountToAdd) {
+        setProgress(player, quest, amountToAdd, true);
+    }
+
+    public static void setProgress(ServerPlayerEntity player, QuestDefinition quest, int amountToSet) {
+        setProgress(player, quest, amountToSet, false);
+    }
+
+    // Generic method to safely set progress and sync it with the client
+    private static void setProgress(ServerPlayerEntity player, QuestDefinition quest, int amount, boolean isIncrementation) {
         MinecraftServer server = Objects.requireNonNull(player.getEntityWorld().getServer());
         QuestState state = QuestState.getServerState(server);
         UUID playerId = player.getUuid();
@@ -27,7 +35,8 @@ public class QuestProgressHandler {
         int current = state.getProgress(playerId, quest.id());
 
         if (current < quest.requiredAmount()) {
-            int newProgress = Math.min(current + amountToAdd, quest.requiredAmount());
+            if (isIncrementation) amount = current + amount;
+            int newProgress = Math.clamp(amount, current, quest.requiredAmount());
             boolean isFinished = newProgress >= quest.requiredAmount();
             state.setProgress(player, quest.id(), newProgress);
 
