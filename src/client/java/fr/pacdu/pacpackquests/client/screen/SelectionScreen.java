@@ -2,13 +2,13 @@ package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
 import fr.pacdu.pacpackquests.client.gui.ScrollbarWidget;
+import fr.pacdu.pacpackquests.client.util.DrawUtils;
 import fr.pacdu.pacpackquests.client.util.TranslationUtils;
 import fr.pacdu.pacpackquests.network.RequestRegistryPayload;
-import fr.pacdu.pacpackquests.util.IconUtils;
+import fr.pacdu.pacpackquests.client.util.IconUtils;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
@@ -50,6 +50,7 @@ public class SelectionScreen extends Screen {
     private final Screen parent;
     private final RegistryType contextType;
     private final Consumer<String> onSelected;
+    private final String previouslySelectedEntry;
 
     private TextFieldWidget searchBox;
     private final List<SelectionEntry> allEntries = new ArrayList<>();
@@ -63,20 +64,21 @@ public class SelectionScreen extends Screen {
     private boolean withTags = true;
     private boolean isReward = false;
 
-    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected) {
+    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, String previouslySelectedEntry) {
         super(Text.translatable("gui.pacpack-quests.select_element"));
         this.parent = parent;
         this.contextType = contextType;
         this.onSelected = onSelected;
+        this.previouslySelectedEntry = previouslySelectedEntry;
     }
 
-    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, boolean withTags) {
-        this(parent, contextType, onSelected);
+    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, String previouslySelectedEntry, boolean withTags) {
+        this(parent, contextType, onSelected, previouslySelectedEntry);
         this.withTags = withTags;
     }
 
-    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, boolean withTags, boolean isReward) {
-        this(parent, contextType, onSelected, withTags);
+    public SelectionScreen(Screen parent, RegistryType contextType, Consumer<String> onSelected, String previouslySelectedEntry, boolean withTags, boolean isReward) {
+        this(parent, contextType, onSelected, previouslySelectedEntry, withTags);
         this.isReward = isReward;
     }
 
@@ -110,9 +112,9 @@ public class SelectionScreen extends Screen {
      */
     private void populateEntries() {
         allEntries.clear();
-        var client = MinecraftClient.getInstance();
         var world = client.world;
         RegistryWrapper.WrapperLookup registries = world != null ? world.getRegistryManager() : DynamicRegistryManager.EMPTY;
+        boolean addPreviousEntry = true;
 
         switch (contextType) {
             case ITEM -> {
@@ -132,23 +134,7 @@ public class SelectionScreen extends Screen {
                 // 2. Populate stacks in creative tab order
                 for (ItemStack stack : searchStacks) {
                     if (stack.isEmpty()) continue;
-
-                    String commandString = ItemUtils.toCommandString(stack, registries);
-                    Identifier baseId = Registries.ITEM.getId(stack.getItem());
-                    String namespace = baseId.getNamespace();
-                    String modName = TranslationUtils.getModName(namespace);
-                    String displayName = stack.getName().getString();
-
-                    // Precompute searchable tooltip text (for enchantments, potion effects, lore)
-                    StringBuilder tooltipText = new StringBuilder();
-                    try {
-                        List<Text> tooltipLines = Screen.getTooltipFromItem(client, stack);
-                        for (Text line : tooltipLines) {
-                            tooltipText.append(line.getString().toLowerCase(Locale.ROOT)).append(" ");
-                        }
-                    } catch (Exception ignored) {}
-
-                    allEntries.add(new SelectionEntry(commandString, stack.copy(), displayName, namespace, modName, baseId.getPath(), tooltipText.toString(), false));
+                    addEntry(ItemUtils.toCommandString(stack, registries));
                 }
 
                 // 3. Add tags last if enabled
@@ -156,14 +142,14 @@ public class SelectionScreen extends Screen {
                     Registries.ITEM.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> {
                         Identifier tagId = key.id();
                         String tagString = "#" + tagId;
-                        addEntry(tagString, tagId, true);
+                        addEntry(tagString);
                     }));
                 }
             }
             case BLOCK -> {
-                Registries.BLOCK.getIds().forEach(id -> addEntry(id.toString(), id, false));
+                Registries.BLOCK.getIds().forEach(id -> addEntry(id.toString()));
                 if (this.withTags) {
-                    Registries.BLOCK.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString(), key.id(), true)));
+                    Registries.BLOCK.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString())));
                 }
                 this.allEntries.sort(this::compareEntries);
             }
@@ -182,7 +168,7 @@ public class SelectionScreen extends Screen {
                     // A valid mob is either in a natural spawn group, has a spawn egg, or is the player explicitly
                     if (group != net.minecraft.entity.SpawnGroup.MISC || hasSpawnEgg || id.getPath().equals("player")) {
                         validMobs.add(id);
-                        addEntry(id.toString(), id, false);
+                        addEntry(id.toString());
                     }
                 });
 
@@ -190,7 +176,7 @@ public class SelectionScreen extends Screen {
                 Registries.ENTITY_TYPE.streamTags().forEach(tagList -> {
                     boolean hasValidMob = tagList.stream().anyMatch(entry -> validMobs.contains(Registries.ENTITY_TYPE.getId(entry.value())));
                     if (hasValidMob) {
-                        tagList.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString(), key.id(), true));
+                        tagList.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString()));
                     }
                 });
                 this.allEntries.sort(this::compareEntries);
@@ -198,8 +184,8 @@ public class SelectionScreen extends Screen {
             case BIOME -> {
                 if (world != null) {
                     var registry = world.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
-                    registry.getIds().forEach(id -> addEntry(id.toString(), id, false));
-                    registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString(), key.id(), true)));
+                    registry.getIds().forEach(id -> addEntry(id.toString()));
+                    registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString())));
                     this.allEntries.sort(this::compareEntries);
                 }
             }
@@ -207,10 +193,11 @@ public class SelectionScreen extends Screen {
                 var server = MinecraftClient.getInstance().getServer();
                 if (server != null) {
                     var registry = server.getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
-                    registry.getIds().forEach(id -> addEntry(id.toString(), id, false));
-                    registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString(), key.id(), true)));
+                    registry.getIds().forEach(id -> addEntry(id.toString()));
+                    registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> addEntry("#" + key.id().toString())));
                     this.allEntries.sort(this::compareEntries);
                 } else {
+                    addPreviousEntry = false;
                     refreshEntries(PacPackQuestsClient.SERVER_STRUCTURES);
                     ClientPlayNetworking.send(new RequestRegistryPayload(RegistryType.STRUCTURE));
                 }
@@ -218,38 +205,82 @@ public class SelectionScreen extends Screen {
             case DIMENSION -> {
                 var handler = MinecraftClient.getInstance().getNetworkHandler();
                 if (handler != null) {
-                    handler.getWorldKeys().forEach(key -> addEntry(key.getValue().toString(), key.getValue(), false));
+                    handler.getWorldKeys().forEach(key -> addEntry(key.getValue().toString()));
                     this.allEntries.sort(this::compareEntries);
                 }
             }
-            case LOOTABLE -> {
-                addEntry("#pacpackquests:loot_chest", Identifier.of("pacpackquests", "loot_chest"), true);
+            case LOOT_TABLE -> {
+                addEntry("#pacpackquests:loot_chest");
                 var server = MinecraftClient.getInstance().getServer();
                 if (server != null) {
                     var opt = server.getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
                     opt.ifPresent(lootTableImpl -> lootTableImpl.streamKeys().forEach(key -> {
                         Identifier id = key.getValue();
                         if (id.getPath().startsWith("chests/")) {
-                            addEntry(id.toString(), id, false);
+                            addEntry(id.toString());
                         }
                     }));
                     this.allEntries.sort(this::compareEntries);
                 } else {
+                    addPreviousEntry = false;
                     refreshEntries(PacPackQuestsClient.SERVER_LOOT_TABLES);
-                    ClientPlayNetworking.send(new RequestRegistryPayload(RegistryType.LOOTABLE));
+                    ClientPlayNetworking.send(new RequestRegistryPayload(RegistryType.LOOT_TABLE));
                 }
             }
             case COMMAND -> {}
         }
+
+        if (addPreviousEntry) {
+            removeEntry(this.previouslySelectedEntry);
+            addEntry(this.previouslySelectedEntry, true);
+        }
     }
 
-    private void addEntry(String idStr, Identifier id, boolean isTag) {
+    private void addEntry(String idStr) {
+        addEntry(idStr, false);
+    }
+
+    private void addEntry(String idStr, boolean atFirst) {
+        if (idStr == null || idStr.isEmpty()) return;
+        var world = client.world;
+        RegistryWrapper.WrapperLookup registries = world != null ? world.getRegistryManager() : DynamicRegistryManager.EMPTY;
+
+        boolean isTag = idStr.startsWith("#");
+        String raw = isTag ? idStr.substring(1) : idStr;
+        if (raw.contains("[")) {
+            raw = raw.substring(0, raw.indexOf('['));
+        }
+
+        Identifier id = Identifier.tryParse(raw);
         String namespace = id != null ? id.getNamespace() : "minecraft";
-        String path = id != null ? id.getPath() : idStr;
+        String path = id != null ? id.getPath() : raw;
         String modName = TranslationUtils.getModName(namespace);
-        ItemStack stack = IconUtils.getRepresentativeItem(idStr, this.contextType).getDefaultStack();
+        ItemStack stack = IconUtils.getRepresentativeItem(idStr, this.contextType);
         String displayName = TranslationUtils.getTranslatedName(idStr, this.contextType, this.isReward);
-        allEntries.add(new SelectionEntry(idStr, stack, displayName, namespace, modName, path, "", isTag));
+        String tooltip = getTooltipText(stack);
+
+        SelectionEntry entry = new SelectionEntry(idStr, stack, displayName, namespace, modName, path, tooltip, isTag);
+        if (atFirst) {
+            allEntries.addFirst(entry);
+        } else {
+            allEntries.add(entry);
+        }
+    }
+
+    private void removeEntry(String idStr) {
+        allEntries.removeIf(entry -> entry.id.equals(idStr));
+    }
+
+    // Precompute searchable tooltip text (for enchantments, potion effects, lore)
+    private String getTooltipText(ItemStack stack) {
+        StringBuilder tooltipText = new StringBuilder();
+        try {
+            List<Text> tooltipLines = Screen.getTooltipFromItem(client, stack);
+            for (Text line : tooltipLines) {
+                tooltipText.append(line.getString().toLowerCase(Locale.ROOT)).append(" ");
+            }
+        } catch (Exception ignored) {}
+        return tooltipText.toString();
     }
 
     public RegistryType getRegistryType() {
@@ -258,14 +289,14 @@ public class SelectionScreen extends Screen {
 
     public void refreshEntries(List<String> newEntries) {
         this.allEntries.clear();
-        if (this.contextType == RegistryType.LOOTABLE) {
-            addEntry("#pacpackquests:loot_chest", Identifier.of("pacpackquests", "loot_chest"), true);
+        if (this.contextType == RegistryType.LOOT_TABLE) {
+            addEntry("#pacpackquests:loot_chest");
         }
         for (String id : newEntries) {
-            Identifier idObj = Identifier.tryParse(id.startsWith("#") ? id.substring(1) : id);
-            addEntry(id, idObj, id.startsWith("#"));
+            addEntry(id);
         }
         this.allEntries.sort(this::compareEntries);
+        addEntry(this.previouslySelectedEntry, true);
         this.updateSearch(this.searchBox != null ? this.searchBox.getText() : "");
     }
 
@@ -341,6 +372,10 @@ public class SelectionScreen extends Screen {
             // If it's a tag, draw a small yellow '#' overlay
             if (entry.isTag) {
                 context.drawText(this.textRenderer, "#", cellX + 2, cellY + 2, 0xFFFFFF00, true);
+            }
+
+            if (this.previouslySelectedEntry.equals(entry.id)) {
+                DrawUtils.drawCheckmark(context, cellX + 11, cellY - 2, 7);
             }
 
             // Hover logic
@@ -492,7 +527,7 @@ public class SelectionScreen extends Screen {
                 }
                 yield -1;
             }
-            case DIMENSION, LOOTABLE, COMMAND -> -1;
+            case DIMENSION, LOOT_TABLE, COMMAND -> -1;
         };
     }
 }

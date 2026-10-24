@@ -8,10 +8,7 @@ import fr.pacdu.pacpackquests.network.*;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
 
 import java.util.List;
 
@@ -126,10 +123,10 @@ public class ClientNetworkHandler {
                 if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.STRUCTURE) {
                     screen.refreshEntries(PacPackQuestsClient.SERVER_STRUCTURES);
                 }
-            } else if (payload.type() == RegistryType.LOOTABLE) {
+            } else if (payload.type() == RegistryType.LOOT_TABLE) {
                 PacPackQuestsClient.SERVER_LOOT_TABLES.clear();
                 PacPackQuestsClient.SERVER_LOOT_TABLES.addAll(payload.entries());
-                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.LOOTABLE) {
+                if (context.client().currentScreen instanceof SelectionScreen screen && screen.getRegistryType() == RegistryType.LOOT_TABLE) {
                     screen.refreshEntries(PacPackQuestsClient.SERVER_LOOT_TABLES);
                 }
             }

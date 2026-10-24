@@ -6,7 +6,6 @@ import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.resource.language.I18n;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.item.ItemStack;
@@ -19,7 +18,6 @@ import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
-import net.minecraft.world.World;
 
 public class TranslationUtils {
 
@@ -180,7 +178,7 @@ public class TranslationUtils {
                 }
                 yield -1;
             }
-            case LOOTABLE -> {
+            case LOOT_TABLE -> {
                 if (tagId.equals(Identifier.of("pacpackquests", "loot_chest"))) {
                     yield PacPackQuestsClient.SERVER_LOOT_TABLES.size();
                 }

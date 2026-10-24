@@ -1,10 +1,18 @@
-package fr.pacdu.pacpackquests.util;
+package fr.pacdu.pacpackquests.client.util;
 
+import fr.pacdu.pacpackquests.util.ItemUtils;
+import fr.pacdu.pacpackquests.util.RegistryType;
+import fr.pacdu.pacpackquests.util.TagUtils;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.registry.DynamicRegistryManager;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -16,25 +24,28 @@ public class IconUtils {
 
     // CACHE: Stores the result of the heavy search so we only compute it ONCE per unique target.
     // The key is a combination of target and taskType (e.g., "minecraft:zombie_MOB") to prevent collisions.
-    private static final Map<String, Item> ICON_CACHE = new HashMap<>();
+    private static final Map<String, ItemStack> ICON_CACHE = new HashMap<>();
 
     /**
      * Returns a representative item for ANY quest target.
      * Guaranteed to be extremely fast and lag-free thanks to the cache.
      */
-    public static Item getRepresentativeItem(String target, RegistryType type) {
+    public static ItemStack getRepresentativeItem(String target, RegistryType type) {
         String cacheKey = target + "_" + type.name();
 
         if (ICON_CACHE.containsKey(cacheKey)) {
             return ICON_CACHE.get(cacheKey);
         }
 
-        Item result = computeRepresentativeItem(target, type);
+        ItemStack result = computeRepresentativeItem(target, type);
         ICON_CACHE.put(cacheKey, result);
         return result;
     }
 
-    private static Item computeRepresentativeItem(String target, RegistryType type) {
+    private static ItemStack computeRepresentativeItem(String target, RegistryType type) {
+        World world = MinecraftClient.getInstance().world;
+        RegistryWrapper.WrapperLookup registries = world != null ? world.getRegistryManager() : DynamicRegistryManager.EMPTY;
+
         boolean isTag = target.startsWith("#");
         String rawTarget = isTag ? target.substring(1) : target;
         if (rawTarget.contains("[")) {
@@ -43,20 +54,20 @@ public class IconUtils {
 
         Identifier id = Identifier.tryParse(rawTarget);
 
-        if (id == null) return getDefaultFallback(type);
+        if (id == null) return getDefaultFallback(type).getDefaultStack();
 
         // --- 1. EXPLICIT RESOLUTION FOR TANGIBLE TARGETS ---
         switch (type) {
             case ITEM -> {
-                return isTag ? TagUtils.getFirstItemInTag(id) : Registries.ITEM.get(id);
+                return ItemUtils.fromCommandString(target, registries);
             }
             case BLOCK -> {
-                if (isTag) return TagUtils.getFirstBlockInTag(id).asItem();
+                if (isTag) return TagUtils.getFirstBlockInTag(id).asItem().getDefaultStack();
                 Item blockItem = Registries.BLOCK.get(id).asItem();
-                return blockItem != Items.AIR ? blockItem : Items.BARRIER;
+                return blockItem != Items.AIR ? blockItem.getDefaultStack() : Items.BARRIER.getDefaultStack();
             }
             case MOB -> {
-                if (id.toString().equals("minecraft:player")) return Items.PLAYER_HEAD;
+                if (id.toString().equals("minecraft:player")) return Items.PLAYER_HEAD.getDefaultStack();
 
                 Identifier eggId;
                 if (isTag) {
@@ -66,8 +77,8 @@ public class IconUtils {
                     eggId = Identifier.of(id.getNamespace(), id.getPath() + "_spawn_egg");
                 }
 
-                if (Registries.ITEM.containsId(eggId)) return Registries.ITEM.get(eggId);
-                return Items.SPAWNER;
+                if (Registries.ITEM.containsId(eggId)) return Registries.ITEM.get(eggId).getDefaultStack();
+                return Items.SPAWNER.getDefaultStack();
             }
             default -> {}
         }
@@ -84,7 +95,7 @@ public class IconUtils {
 
         if (isVanilla) {
             Item heuristic = getHeuristicIcon(path, type);
-            if (heuristic != null) return heuristic;
+            if (heuristic != null) return heuristic.getDefaultStack();
         }
 
         // Filter out more generic tag words like "taskType", "is", "primary"
@@ -103,7 +114,7 @@ public class IconUtils {
                     for (String kw : keywords) {
                         if (itemPath.contains(kw)) {
                             Item item = Registries.ITEM.get(itemId);
-                            if (item instanceof BlockItem) return item;
+                            if (item instanceof BlockItem) return item.getDefaultStack();
                             if (bestMatch == null) bestMatch = item;
                         }
                     }
@@ -111,21 +122,22 @@ public class IconUtils {
             }
         }
 
-        if (bestMatch != null) return bestMatch;
+        if (bestMatch != null) return bestMatch.getDefaultStack();
 
         if (!isVanilla) {
             Item heuristic = getHeuristicIcon(path, type);
-            if (heuristic != null) return heuristic;
+            if (heuristic != null) return heuristic.getDefaultStack();
         }
 
-        return getDefaultFallback(type);
+        return getDefaultFallback(type).getDefaultStack();
     }
 
     private static Item getDefaultFallback(RegistryType type) {
         return switch (type) {
             case DIMENSION -> Items.OBSIDIAN;
             case BIOME -> Items.GRASS_BLOCK;
-            case STRUCTURE, LOOTABLE -> Items.CHEST;
+            case STRUCTURE -> Items.CHISELED_SANDSTONE;
+            case LOOT_TABLE -> Items.CHEST;
             default -> Items.BARRIER;
         };
     }

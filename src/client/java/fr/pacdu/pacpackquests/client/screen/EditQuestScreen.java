@@ -143,7 +143,7 @@ public class EditQuestScreen extends Screen {
             this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
                 this.selectedIcon = result;
                 this.iconButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, RegistryType.ITEM))));
-            }, false));
+            }, this.selectedIcon, false));
         }).dimensions(col2, y, fieldWidth, fieldHeight).build();
         this.addDrawableChild(this.iconButton);
 
@@ -219,7 +219,7 @@ public class EditQuestScreen extends Screen {
             this.client.setScreen(new SelectionScreen(this, ctx, result -> {
                 this.selectedTarget = result;
                 this.targetButton.setMessage(Text.literal(formatDisplayString(getTranslatedName(result, ctx))));
-            }));
+            }, this.selectedTarget));
         }).dimensions(col1, y, fieldWidth, fieldHeight).build();
         this.addDrawableChild(this.targetButton);
 
@@ -234,7 +234,7 @@ public class EditQuestScreen extends Screen {
                 this.client.setScreen(new SelectionScreen(this, RegistryType.ITEM, result -> {
                     this.selectedReward = result;
                     updateRewardButtonMessage();
-                }, true, true));
+                }, this.selectedReward, true, true));
             }
         }).dimensions(col2, y, fieldWidth, fieldHeight).build();
         this.rewardButton.active = (currentRewardType != RewardType.XP && currentRewardType != RewardType.LEVEL);
@@ -281,7 +281,7 @@ public class EditQuestScreen extends Screen {
             case EXPLORE_BIOME -> RegistryType.BIOME;
             case EXPLORE_STRUCTURE -> RegistryType.STRUCTURE;
             case EXPLORE_DIMENSION -> RegistryType.DIMENSION;
-            case OPEN_LOOT_CHEST -> RegistryType.LOOTABLE;
+            case OPEN_LOOT_CHEST -> RegistryType.LOOT_TABLE;
         };
     }
 

@@ -40,7 +40,7 @@ public enum TaskType {
             case EXPLORE_BIOME -> RegistryType.BIOME;
             case EXPLORE_STRUCTURE -> RegistryType.STRUCTURE;
             case EXPLORE_DIMENSION -> RegistryType.DIMENSION;
-            case OPEN_LOOT_CHEST -> RegistryType.LOOTABLE;
+            case OPEN_LOOT_CHEST -> RegistryType.LOOT_TABLE;
         };
     }
 }

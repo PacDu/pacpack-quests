@@ -10,6 +10,6 @@ public enum RegistryType {
     BIOME,
     STRUCTURE,
     DIMENSION,
-    LOOTABLE,
+    LOOT_TABLE,
     COMMAND
 }

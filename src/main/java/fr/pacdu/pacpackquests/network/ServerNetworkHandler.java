@@ -13,7 +13,6 @@ import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import fr.pacdu.pacpackquests.util.RewardUtils;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
@@ -267,7 +266,7 @@ public class ServerNetworkHandler {
                 var registry = context.server().getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE);
                 registry.getIds().forEach(id -> entries.add(id.toString()));
                 registry.streamTags().forEach(tag -> tag.getTagKey().ifPresent(key -> entries.add("#" + key.id().toString())));
-            } else if (payload.type() == RegistryType.LOOTABLE) {
+            } else if (payload.type() == RegistryType.LOOT_TABLE) {
                 entries.add("#pacpackquests:loot_chest");
                 var opt = context.server().getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
                 opt.ifPresent(lootTableImpl -> lootTableImpl.streamKeys().forEach(key -> {

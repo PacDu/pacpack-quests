@@ -1,16 +1,15 @@
 package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.client.util.DrawUtils;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -218,17 +217,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         super.renderNodeBase(context, node, bgColor);
 
         if (isSelected) {
-            context.fill(node.x() + 10, node.y() - 6, node.x() + 22, node.y() + 6, 0xFF000000); // outline
-            context.fill(node.x() + 11, node.y() - 5, node.x() + 21, node.y() + 5, 0xFF00AA00); // background
-            
-            // Simple 90-degree checkmark
-            context.fill(node.x() + 13, node.y() + 1, node.x() + 14, node.y() + 3, 0xFFFFFFFF);
-            context.fill(node.x() + 14, node.y() + 2, node.x() + 15, node.y() + 4, 0xFFFFFFFF);
-            context.fill(node.x() + 15, node.y() + 3, node.x() + 16, node.y() + 5, 0xFFFFFFFF);
-            context.fill(node.x() + 16, node.y() + 2, node.x() + 17, node.y() + 4, 0xFFFFFFFF);
-            context.fill(node.x() + 17, node.y() + 1, node.x() + 18, node.y() + 3, 0xFFFFFFFF);
-            context.fill(node.x() + 18, node.y() + 0, node.x() + 19, node.y() + 2, 0xFFFFFFFF);
-            context.fill(node.x() + 19, node.y() - 1, node.x() + 20, node.y() + 1, 0xFFFFFFFF);
+            DrawUtils.drawCheckmark(context, node.x() + 13, node.y() - 7, 9);
         }
     }
 
