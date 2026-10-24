@@ -244,6 +244,7 @@ public class EditQuestScreen extends Screen {
         // ROW 5: Amounts
         y += yStep;
         this.reqAmountField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.required_amount"));
+        this.reqAmountField.setMaxLength(7);
         this.reqAmountField.setTextPredicate(text -> text.matches("^[0-9]*$"));
         this.reqAmountField.setText(initialReqAmt);
         this.reqAmountField.setEditable(this.currentTaskType != TaskType.EXPLORE_DIMENSION && this.currentTaskType != TaskType.EXPLORE_BIOME);
@@ -251,6 +252,7 @@ public class EditQuestScreen extends Screen {
         this.addDrawableChild(this.reqAmountField);
 
         this.rewardAmountField = new TextFieldWidget(this.textRenderer, col2, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.reward_amount"));
+        this.rewardAmountField.setMaxLength(7);
         this.rewardAmountField.setTextPredicate(text -> text.matches("^[0-9]*$"));
         this.rewardAmountField.setText(initialRewAmt);
         this.addDrawableChild(this.rewardAmountField);
@@ -384,6 +386,11 @@ public class EditQuestScreen extends Screen {
         try {
             reqAmt = Integer.parseInt(this.reqAmountField.getText().trim());
             if (reqAmt <= 0) throw new NumberFormatException();
+            if (currentTaskType == TaskType.OBTAIN_ITEM && reqAmt > 2304) {
+                this.errorMessage = "error.pacpack-quests.invalid_object_amount";
+                this.reqAmountField.setEditableColor(0xFFFF5555);
+                return;
+            }
         } catch (NumberFormatException e) {
             this.errorMessage = "error.pacpack-quests.invalid_amount";
             this.reqAmountField.setEditableColor(0xFFFF5555);
@@ -401,6 +408,11 @@ public class EditQuestScreen extends Screen {
         try {
             rewAmt = Integer.parseInt(this.rewardAmountField.getText().trim());
             if (rewAmt <= 0) throw new NumberFormatException();
+            if (currentRewardType == RewardType.ITEM && rewAmt > 2304) {
+                this.errorMessage = "error.pacpack-quests.invalid_object_amount";
+                this.rewardAmountField.setEditableColor(0xFFFF5555);
+                return;
+            }
         } catch (NumberFormatException e) {
             this.errorMessage = "error.pacpack-quests.invalid_amount";
             this.rewardAmountField.setEditableColor(0xFFFF5555);

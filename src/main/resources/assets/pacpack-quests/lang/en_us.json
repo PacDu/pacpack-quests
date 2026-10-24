@@ -1,8 +1,9 @@
 {
   "error.pacpack-quests.id_already_exists": "This Quest ID already exists!",
-  "error.pacpack-quests.invalid_amount": "Amount must be greater than 0!",
+  "error.pacpack-quests.invalid_amount": "Amount must be a integer number greater than 0!",
   "error.pacpack-quests.invalid_icon": "Invalid Icon! The item does not exist.",
   "error.pacpack-quests.invalid_id": "Invalid ID! Use only lowercase letters, numbers, and underscores.",
+  "error.pacpack-quests.invalid_object_amount": "Items amount must be <= 2304.",
   "error.pacpack-quests.invalid_reward_item": "Invalid Reward! The item does not exist.",
   "error.pacpack-quests.invalid_target": "Invalid Target! Check the ID or Tag.",
   "error.pacpack-quests.missing_title": "The title cannot be empty!",
