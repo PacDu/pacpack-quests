@@ -180,6 +180,14 @@ public class TranslationUtils {
             }
             case LOOT_TABLE -> {
                 if (tagId.equals(Identifier.of("pacpackquests", "loot_chest"))) {
+                    if (client != null && client.getServer() != null) {
+                        var opt = client.getServer().getReloadableRegistries().createRegistryLookup().getOptional(RegistryKeys.LOOT_TABLE);
+                        if (opt.isPresent()) {
+                            yield (int) opt.get().streamKeys()
+                                    .filter(key -> key.getValue().getPath().startsWith("chests/"))
+                                    .count();
+                        }
+                    }
                     yield PacPackQuestsClient.SERVER_LOOT_TABLES.size();
                 }
                 yield -1;

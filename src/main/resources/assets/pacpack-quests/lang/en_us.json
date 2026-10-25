@@ -10,7 +10,7 @@
   "error.pacpack-quests.self_parent": "A quest cannot be its own parent!",
   "error.pacpack-quests.unknown_parent": "One or more parent IDs do not exist!",
 
-  "form.pacpack-quests.icon_item_id": "Icon",
+  "form.pacpack-quests.icon": "Icon",
   "form.pacpack-quests.parents": "Parents Quests",
   "form.pacpack-quests.quest_id": "Unique ID",
   "form.pacpack-quests.quest_id_placeholder": "auto_generated",
@@ -76,7 +76,7 @@
   "registry.pacpack-quests.mob": "mobs",
   "registry.pacpack-quests.biome": "biomes",
   "registry.pacpack-quests.structure": "structures",
-  "registry.pacpack-quests.lootable": "lootables",
+  "registry.pacpack-quests.loot_table": "loot chests",
 
   "reward.pacpack-quests.command": "Command",
   "reward.pacpack-quests.item": "Item",

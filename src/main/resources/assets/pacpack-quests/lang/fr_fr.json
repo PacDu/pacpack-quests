@@ -10,7 +10,7 @@
   "error.pacpack-quests.self_parent": "Une quête ne peut pas être son propre parent !",
   "error.pacpack-quests.unknown_parent": "Un ou plusieurs IDs parents n'existent pas !",
 
-  "form.pacpack-quests.icon_item_id": "Icône",
+  "form.pacpack-quests.icon": "Icône",
   "form.pacpack-quests.parents": "Quêtes Parentes",
   "form.pacpack-quests.quest_id": "Identifiant Unique",
   "form.pacpack-quests.quest_id_placeholder": "genere_automatiquement",
@@ -76,8 +76,7 @@
   "registry.pacpack-quests.mob": "entités",
   "registry.pacpack-quests.biome": "biomes",
   "registry.pacpack-quests.structure": "structures",
-  "registry.pacpack-quests.dimension": "dimensions",
-  "registry.pacpack-quests.lootable": "pillables",
+  "registry.pacpack-quests.loot_table": "coffres à butin",
 
   "reward.pacpack-quests.command": "Commande",
   "reward.pacpack-quests.item": "Objet(s)",
