@@ -176,6 +176,19 @@ public class ServerNetworkHandler {
                     Files.deleteIfExists(questFile);
                     QuestManager.LOADED_QUESTS.remove(payload.questId());
                     context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, new DeleteQuestPayload(payload.questId())));
+
+                    // Remove it from the parents of quests that has it as a parent
+                    QuestManager.LOADED_QUESTS.forEach((id, questDefinition) -> {
+                        if (questDefinition.parents().remove(payload.questId())) {
+                            QuestSyncPayload syncPacket = new QuestSyncPayload(
+                                    id, questDefinition.title(), questDefinition.category(), questDefinition.taskType(),
+                                    questDefinition.target(), questDefinition.requiredAmount(), ItemUtils.toCommandString(questDefinition.icon()), questDefinition.reward(),
+                                    questDefinition.rewardType(), questDefinition.rewardAmount(), questDefinition.parents(),
+                                    questDefinition.displayX(), questDefinition.displayY()
+                            );
+                            context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));
+                        }
+                    });
                 } catch (Exception e) {
                     PacPackQuests.LOGGER.error("Failed to delete quest", e);
                 }
