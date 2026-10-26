@@ -103,51 +103,14 @@ public class ServerNetworkHandler {
         ServerPlayNetworking.registerGlobalReceiver(SaveQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
             if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
-            Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(payload.category());
-            Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(payload.category(), payload.questId());
-            if (categoryDirOpt.isEmpty() || questFileOpt.isEmpty()) {
-                PacPackQuests.LOGGER.warn("Blocked unsafe save quest attempt: category={}, id={}", payload.category(), payload.questId());
-                return;
-            }
+            QuestDefinition quest = new QuestDefinition(
+                    payload.questId(), payload.title(), payload.category(), payload.taskType(), payload.target(),
+                    payload.requiredAmount(), ItemUtils.fromCommandString(payload.iconId(), context.server().getRegistryManager()),
+                    payload.reward(), payload.rewardType(),
+                    payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
+            );
 
-            Path categoryDir = categoryDirOpt.get();
-            try { Files.createDirectories(categoryDir); } catch (Exception ignored) {}
-
-            Path questFile = questFileOpt.get();
-
-            JsonObject json = new JsonObject();
-            json.addProperty("title", payload.title());
-            json.addProperty("taskType", payload.taskType().toString());
-            json.addProperty("target", payload.target());
-            json.addProperty("requiredAmount", payload.requiredAmount());
-            json.addProperty("icon", payload.iconId());
-            json.addProperty("rewardType", payload.rewardType().toString());
-
-            switch (payload.rewardType()) {
-                case XP -> json.addProperty("reward", "xp");
-                case LEVEL -> json.addProperty("reward", "level");
-                case ITEM, COMMAND -> json.addProperty("reward", payload.reward());
-            }
-            json.addProperty("rewardAmount", payload.rewardAmount());
-
-            if (payload.parents() != null && !payload.parents().isEmpty()) {
-                json.add("parents", GSON.toJsonTree(payload.parents()));
-            }
-
-            json.addProperty("displayX", payload.displayX());
-            json.addProperty("displayY", payload.displayY());
-
-            try {
-                Files.writeString(questFile, GSON.toJson(json));
-
-                QuestDefinition newDef = new QuestDefinition(
-                        payload.questId(), payload.title(), payload.category(), payload.taskType(), payload.target(),
-                        payload.requiredAmount(), ItemUtils.fromCommandString(payload.iconId(), context.server().getRegistryManager()),
-                        payload.reward(), payload.rewardType(),
-                        payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
-                );
-                QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
-
+            if (QuestManager.saveQuest(quest, context.server().getRegistryManager())) {
                 QuestSyncPayload syncPacket = new QuestSyncPayload(
                         payload.questId(), payload.title(), payload.category(), payload.taskType(),
                         payload.target(), payload.requiredAmount(), payload.iconId(), payload.reward(),
@@ -155,8 +118,6 @@ public class ServerNetworkHandler {
                         payload.displayX(), payload.displayY()
                 );
                 context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));
-            } catch (Exception e) {
-                PacPackQuests.LOGGER.error("Failed to save quest", e);
             }
         }));
 
@@ -179,10 +140,10 @@ public class ServerNetworkHandler {
 
                     // Remove it from the parents of quests that has it as a parent
                     QuestManager.LOADED_QUESTS.forEach((id, questDefinition) -> {
-                        if (questDefinition.parents().remove(payload.questId())) {
+                        if (questDefinition.parents().remove(payload.questId()) && QuestManager.saveQuest(questDefinition, context.server().getRegistryManager())) {
                             QuestSyncPayload syncPacket = new QuestSyncPayload(
                                     id, questDefinition.title(), questDefinition.category(), questDefinition.taskType(),
-                                    questDefinition.target(), questDefinition.requiredAmount(), ItemUtils.toCommandString(questDefinition.icon()), questDefinition.reward(),
+                                    questDefinition.target(), questDefinition.requiredAmount(), ItemUtils.toCommandString(questDefinition.icon(), context.server().getRegistryManager()), questDefinition.reward(),
                                     questDefinition.rewardType(), questDefinition.rewardAmount(), questDefinition.parents(),
                                     questDefinition.displayX(), questDefinition.displayY()
                             );

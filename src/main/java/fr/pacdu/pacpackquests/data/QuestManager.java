@@ -5,7 +5,10 @@ import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.network.QuestSyncPayload;
 import fr.pacdu.pacpackquests.util.ItemUtils;
+import fr.pacdu.pacpackquests.util.PathSecurity;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -34,10 +37,6 @@ public class QuestManager {
 
     public static void loadQuests(MinecraftServer server) {
         loadQuests(server != null ? server.getRegistryManager() : null);
-    }
-
-    public static void loadQuests() {
-        loadQuests((RegistryWrapper.WrapperLookup) null);
     }
 
     public static void loadQuests(RegistryWrapper.WrapperLookup registries) {
@@ -73,6 +72,50 @@ public class QuestManager {
         }
 
         PacPackQuests.LOGGER.info("Successfully loaded {} quests!", LOADED_QUESTS.size());
+    }
+
+    public static boolean saveQuest(QuestDefinition quest, RegistryWrapper.WrapperLookup registries) {
+        Optional<Path> categoryDirOpt = PathSecurity.getSafeCategoryDir(quest.category());
+        Optional<Path> questFileOpt = PathSecurity.getSafeQuestFile(quest.category(), quest.id());
+        if (categoryDirOpt.isEmpty() || questFileOpt.isEmpty()) {
+            PacPackQuests.LOGGER.warn("Blocked unsafe save quest attempt: category={}, id={}", quest.category(), quest.id());
+            return false;
+        }
+
+        Path categoryDir = categoryDirOpt.get();
+        try { Files.createDirectories(categoryDir); } catch (Exception ignored) {}
+
+        Path questFile = questFileOpt.get();
+
+        JsonObject json = new JsonObject();
+        json.addProperty("title", quest.title());
+        json.addProperty("taskType", quest.taskType().toString());
+        json.addProperty("target", quest.target());
+        json.addProperty("requiredAmount", quest.requiredAmount());
+        json.addProperty("icon", ItemUtils.toCommandString(quest.icon(), registries));
+        json.addProperty("rewardType", quest.rewardType().toString());
+
+        switch (quest.rewardType()) {
+            case XP -> json.addProperty("reward", "xp");
+            case LEVEL -> json.addProperty("reward", "level");
+            case ITEM, COMMAND -> json.addProperty("reward", quest.reward());
+        }
+        json.addProperty("rewardAmount", quest.rewardAmount());
+
+        if (quest.parents() != null && !quest.parents().isEmpty()) {
+            json.add("parents", GSON.toJsonTree(quest.parents()));
+        }
+
+        json.addProperty("displayX", quest.displayX());
+        json.addProperty("displayY", quest.displayY());
+
+        try {
+            Files.writeString(questFile, GSON.toJson(json));
+            QuestManager.LOADED_QUESTS.put(quest.id(), quest);
+        } catch (Exception e) {
+            PacPackQuests.LOGGER.error("Failed to save quest", e);
+        }
+        return true;
     }
 
     private static void assertParseAndAddQuest(String filePath, JsonObject json, RegistryWrapper.WrapperLookup registries) {

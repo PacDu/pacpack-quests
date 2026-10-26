@@ -243,6 +243,11 @@ public class EditQuestScreen extends Screen {
             // Restore the ID typed during the creation of a new quest or the duplication of another one
             this.idField.setText(currentId);
             this.idField.setPlaceholder(Text.translatable("form.pacpack-quests.quest_id_placeholder").formatted(Formatting.DARK_GRAY));
+            this.idField.setChangedListener(newId -> {
+                if (!this.isIdManuallyEdited && this.idField.isFocused() && !newId.equals(PathSecurity.formatStringToValidPath(this.titleField.getText()))) {
+                    this.isIdManuallyEdited = true;
+                }
+            });
 
             // Add a listener to dynamically change the ID according to the title
             this.titleField.setChangedListener(newTitle -> {
