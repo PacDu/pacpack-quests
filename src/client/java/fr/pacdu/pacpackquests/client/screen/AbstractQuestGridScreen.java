@@ -112,25 +112,78 @@ public abstract class AbstractQuestGridScreen extends Screen {
             panX = (windowWidth - gridMaxX * zoom) / 2.0;
             panY = (windowHeight - gridMaxY * zoom) / 2.0;
         } else {
-            panX = clampAxis(panX, windowWidth, gridMaxX, bounds.minX, bounds.maxX);
-            panY = clampAxis(panY, windowHeight, gridMaxY, bounds.minY, bounds.maxY);
+            panX = clampAxis(panX, windowWidth, bounds.minX, bounds.maxX);
+            panY = clampAxis(panY, windowHeight, bounds.minY, bounds.maxY);
         }
     }
 
     /**
-     * Computes the active bounding box once:
-     * - Full grid bounds if forceFullGridBounds() is true
-     * - Clamped node bounds in normal mode
-     * - null if there are no visible nodes in normal mode
+     * Centers the camera on specific canvas coordinates (canvasX, canvasY).
      */
-    private Bounds getActiveBounds() {
+    public void centerOn(int canvasX, int canvasY) {
+        zoom = 1.0f;
+        panX = (windowWidth / 2.0) - canvasX * zoom;
+        panY = (windowHeight / 2.0) - canvasY * zoom;
+        clampPanning();
+    }
+
+    /**
+     * Resets zoom to 1.0f and adaptively positions the camera:
+     * - Horizontal: Centers if content fits; otherwise aligns leftmost quest to the left border with padding.
+     * - Vertical: Centers on the leftmost quest(s) (or the whole tree if it fits), clamped within bounds so the starting quest never disappears.
+     */
+    public void resetCamera() {
+        zoom = 1.0f;
+        Bounds bounds = getNodeBounds();
         int gridMaxX = getGridMax(canvasOffsetX, maxGridColumns);
         int gridMaxY = getGridMax(canvasOffsetY, maxGridRows);
 
-        if (forceFullGridBounds()) {
-            return new Bounds(0, gridMaxX, 0, gridMaxY);
-        }
+        if (bounds == null) {
+            panX = (windowWidth - gridMaxX * zoom) / 2.0;
+            panY = (windowHeight - gridMaxY * zoom) / 2.0;
+        } else {
+            List<? extends GridNode> nodes = getNodes();
+            double contentWidth = (bounds.maxX - bounds.minX) * zoom;
+            double contentHeight = (bounds.maxY - bounds.minY) * zoom;
 
+            // 1. Horizontal axis (X)
+            if (contentWidth <= windowWidth) {
+                panX = (windowWidth - (bounds.minX + bounds.maxX) * zoom) / 2.0;
+            } else {
+                panX = -bounds.minX * zoom;
+            }
+
+            // 2. Vertical axis (Y)
+            if (contentHeight <= windowHeight) {
+                panY = (windowHeight - (bounds.minY + bounds.maxY) * zoom) / 2.0;
+            } else if (nodes != null && !nodes.isEmpty()) {
+                // When height exceeds window: align to the topmost quest among the leftmost starting quests
+                int minX = Integer.MAX_VALUE;
+                for (GridNode node : nodes) {
+                    minX = Math.min(minX, node.x());
+                }
+
+                int minLeftY = Integer.MAX_VALUE;
+                for (GridNode node : nodes) {
+                    if (node.x() == minX) {
+                        minLeftY = Math.min(minLeftY, node.y());
+                    }
+                }
+
+                int topGutter = Math.max(0, minLeftY - 4 - PADDING);
+                panY = -topGutter * zoom;
+            } else {
+                panY = -bounds.minY * zoom;
+            }
+        }
+        clampPanning();
+    }
+
+    /**
+     * Computes the bounding box of current nodes, including padding.
+     * Returns null if no nodes exist.
+     */
+    protected Bounds getNodeBounds() {
         List<? extends GridNode> nodes = getNodes();
         if (nodes == null || nodes.isEmpty()) {
             return null;
@@ -146,12 +199,30 @@ public abstract class AbstractQuestGridScreen extends Screen {
             maxY = Math.max(maxY, node.y());
         }
 
+        int gridMaxX = getGridMax(canvasOffsetX, maxGridColumns);
+        int gridMaxY = getGridMax(canvasOffsetY, maxGridRows);
+
         return new Bounds(
                 Math.max(0, minX - 4 - PADDING),
                 Math.min(gridMaxX, maxX + 20 + PADDING),
                 Math.max(0, minY - 4 - PADDING),
                 Math.min(gridMaxY, maxY + 20 + PADDING)
         );
+    }
+
+    /**
+     * Computes the active bounding box once:
+     * - Full grid bounds if forceFullGridBounds() is true
+     * - Clamped node bounds in normal mode
+     * - null if there are no visible nodes in normal mode
+     */
+    private Bounds getActiveBounds() {
+        if (forceFullGridBounds()) {
+            int gridMaxX = getGridMax(canvasOffsetX, maxGridColumns);
+            int gridMaxY = getGridMax(canvasOffsetY, maxGridRows);
+            return new Bounds(0, gridMaxX, 0, gridMaxY);
+        }
+        return getNodeBounds();
     }
 
     private int getGridMax(int offset, int count) {
@@ -174,15 +245,16 @@ public abstract class AbstractQuestGridScreen extends Screen {
      * Computes and clamps the pan value for a single axis (X or Y),
      * restricting it to the active bounds without exceeding the grid bounds.
      */
-    @SuppressWarnings("MathClampMigration") // False positive, we remove the warning
-    private double clampAxis(double pan, int windowSize, int gridMax, int nodeMin, int nodeMax) {
-        double g2 = windowSize - gridMax * zoom;
-        double n1 = -nodeMin * zoom, n2 = windowSize - nodeMax * zoom;
+    private double clampAxis(double pan, int windowSize, int nodeMin, int nodeMax) {
+        double contentSize = (nodeMax - nodeMin) * zoom;
+        if (contentSize <= windowSize) {
+            return (windowSize - (nodeMin + nodeMax) * zoom) / 2.0;
+        }
 
-        double minPan = Math.max(Math.min(0, g2), Math.min(n1, n2));
-        double maxPan = Math.min(Math.max(0, g2), Math.max(n1, n2));
+        double minPan = windowSize - nodeMax * zoom;
+        double maxPan = -nodeMin * zoom;
 
-        return minPan > maxPan ? (minPan + maxPan) / 2.0 : Math.clamp(pan, minPan, maxPan);
+        return Math.clamp(pan, minPan, maxPan);
     }
 
     // --- RENDER HELPERS ---

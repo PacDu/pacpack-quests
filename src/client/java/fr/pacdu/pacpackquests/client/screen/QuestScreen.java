@@ -42,6 +42,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 	// --- Edit Mode System ---
 	private boolean isEditMode = false;
+	private boolean cameraInitialized = false;
 	private String categoryClickTarget = null;
 	private String categoryEditTarget = null;
 	private String draggedCategory = null;
@@ -129,6 +130,12 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 
 		refreshQuests();
+		if (!this.cameraInitialized) {
+			resetCamera();
+			this.cameraInitialized = true;
+		} else {
+			clampPanning();
+		}
 	}
 
 	private void refreshQuests() {
@@ -509,13 +516,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					// 2. Normal click to change category OR prepare drag
 					if (mouseX >= tabX && mouseX <= tabX + tabWidth && adjustedMouseY >= currentTabY && adjustedMouseY <= currentTabY + tabHeight
 							&& (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget))) {
-						selectedCategory = category;
-
-						// Reset camera pos when refreshing or switching tabs
-						panX = 0;
-						panY = 0;
-
-						refreshQuests();
+						if (!category.equals(selectedCategory)) {
+							selectedCategory = category;
+							refreshQuests();
+							resetCamera();
+						}
 						if (isEditMode) {
 							categoryClickTarget = category;
 						}
@@ -898,12 +903,15 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		}
 		selectedCategory = categoryName;
 		refreshQuests();
+		resetCamera();
 	}
 
 	public void removeCategory(String categoryName) {
 		// If the deleted category was the one open, we switch to another one
 		if (selectedCategory.equals(categoryName)) {
 			selectedCategory = CLIENT_CATEGORIES.isEmpty() ? "main" : CLIENT_CATEGORIES.getFirst();
+			refreshQuests();
+			resetCamera();
 		}
 		this.refreshUI();
 	}

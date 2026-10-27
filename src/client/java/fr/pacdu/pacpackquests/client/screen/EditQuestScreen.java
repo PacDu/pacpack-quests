@@ -139,7 +139,7 @@ public class EditQuestScreen extends Screen {
         this.addDrawableChild(this.titleField);
 
         this.parentsButton = ButtonWidget.builder(Text.literal(initialParents.isEmpty() ? "None" : initialParents.split(",").length + " parents"), button -> {
-            this.client.setScreen(new ParentSelectionScreen(this, this.idField.getText(), this.category, this.selectedParents, this.titleField.getText(), this.gridX, this.gridY, this.selectedIcon));
+            this.client.setScreen(new ParentSelectionScreen(this, this.questId != null ? this.questId : "", this.category, this.selectedParents, this.titleField.getText(), this.gridX, this.gridY, this.selectedIcon));
         }).dimensions(col2, y, fieldWidth, fieldHeight).build();
         this.addDrawableChild(this.parentsButton);
 

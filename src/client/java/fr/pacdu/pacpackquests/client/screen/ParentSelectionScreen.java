@@ -92,6 +92,23 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
             .dimensions((this.width / 2) - buttonWidth / 2, this.height - 35, buttonWidth, buttonHeight)
             .build()
         );
+
+        SelectionNode targetNode = null;
+        for (SelectionNode node : this.nodes) {
+            if (this.questId != null && !this.questId.isEmpty() && node.id().equals(this.questId)) {
+                targetNode = node;
+                break;
+            }
+        }
+        if (targetNode == null && !this.nodes.isEmpty()) {
+            targetNode = this.nodes.getLast();
+        }
+
+        if (targetNode != null) {
+            centerOn(targetNode.x() + 8, targetNode.y() + 8);
+        } else {
+            centerOn(canvasOffsetX + (this.tempX * gridSpacing) + 16, canvasOffsetY + (this.tempY * gridSpacing) + 16);
+        }
     }
 
     @Override
