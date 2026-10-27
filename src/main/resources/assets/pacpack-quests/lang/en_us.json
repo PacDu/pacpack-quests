@@ -10,6 +10,8 @@
   "error.pacpack-quests.self_parent": "A quest cannot be its own parent!",
   "error.pacpack-quests.unknown_parent": "One or more parent IDs do not exist!",
 
+  "form.pacpack-quests.command": "Command",
+  "form.pacpack-quests.command_description": "Command Description",
   "form.pacpack-quests.icon": "Icon",
   "form.pacpack-quests.parents": "Parents Quests",
   "form.pacpack-quests.quest_id": "Unique ID",

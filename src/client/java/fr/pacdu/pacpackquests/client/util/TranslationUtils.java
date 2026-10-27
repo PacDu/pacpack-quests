@@ -1,11 +1,12 @@
 package fr.pacdu.pacpackquests.client.util;
 
-import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
+import fr.pacdu.pacpackquests.reward.*;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.RegistryType;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.resource.language.I18n;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.item.ItemStack;
@@ -26,21 +27,31 @@ public class TranslationUtils {
     /**
      * Formats the visual display text of a reward with appropriate styling and color.
      */
-    public static Text getRewardText(RewardType type, String reward, int amount, boolean isClaimed) {
-        if (type == null) return Text.empty();
+    public static Text getRewardText(QuestReward reward, boolean isClaimed) {
+        if (reward == null) return Text.empty();
 
-        MutableText text = switch (type) {
-            case XP -> Text.literal(amount + " XP");
-            case LEVEL -> Text.literal(amount + " ").append(Text.translatable("gui.pacpack-quests.levels"));
-            case ITEM -> Text.literal(amount + "x ").append(getTranslatedRewardName(reward, RegistryType.ITEM));
-            case COMMAND -> Text.literal(amount + "x ").append(Text.literal((reward.startsWith("/") ? "" : "/") + (reward.length() > 64 ? reward.substring(0, 64) + "..." : reward)));
+        MutableText text = switch (reward) {
+            case XpReward xr -> Text.literal(xr.amount() + " XP");
+            case LevelReward lr -> Text.literal(lr.amount() + " ").append(Text.translatable("gui.pacpack-quests.levels"));
+            case ItemReward ir -> Text.literal(ir.amount() + "x ").append(getTranslatedRewardName(ir.target(), RegistryType.ITEM));
+            case CommandReward cr -> {
+                if (cr.description() != null && !cr.description().isBlank()) {
+                    Text descText = I18n.hasTranslation(cr.description())
+                            ? Text.translatable(cr.description())
+                            : Text.literal(cr.description());
+                    yield Text.literal(cr.amount() + "x ").append(descText);
+                } else {
+                    String cmd = cr.command();
+                    yield Text.literal(cr.amount() + "x ").append(Text.literal((cmd.startsWith("/") ? "" : "/") + (cmd.length() > 64 ? cmd.substring(0, 64) + "..." : cmd)));
+                }
+            }
         };
 
         if (isClaimed) {
             return text.formatted(Formatting.DARK_GRAY, Formatting.STRIKETHROUGH);
         }
 
-        return switch (type) {
+        return switch (reward.type()) {
             case XP -> text.formatted(Formatting.GREEN);
             case LEVEL -> text.formatted(Formatting.DARK_GREEN, Formatting.BOLD);
             case ITEM -> text.formatted(Formatting.WHITE);

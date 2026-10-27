@@ -8,10 +8,9 @@ import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestState;
-import fr.pacdu.pacpackquests.util.ItemUtils;
+import fr.pacdu.pacpackquests.reward.QuestReward;
 import fr.pacdu.pacpackquests.util.PathSecurity;
 import fr.pacdu.pacpackquests.util.RegistryType;
-import fr.pacdu.pacpackquests.util.RewardUtils;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -44,7 +43,11 @@ public class ServerNetworkHandler {
                 boolean claimed = questState.isClaimed(playerId, quest.id());
 
                 if (progress >= quest.requiredAmount() && !claimed) {
-                    RewardUtils.grantReward(player, quest, context.server().getRegistryManager());
+                    if (quest.rewards() != null) {
+                        for (QuestReward reward : quest.rewards()) {
+                            reward.grant(player, context.server().getRegistryManager());
+                        }
+                    }
                     questState.setClaimed(playerId, quest.id(), true);
                     ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, true, true));
                 }
@@ -72,23 +75,10 @@ public class ServerNetworkHandler {
                     json.addProperty("displayY", payload.newY());
                     Files.writeString(questFile, GSON.toJson(json));
 
-                    QuestDefinition newDef = new QuestDefinition(
-                            quest.id(), quest.title(), quest.category(),
-                            quest.taskType(), quest.target(), quest.requiredAmount(),
-                            quest.icon(), quest.reward(), quest.rewardType(),
-                            quest.rewardAmount(), quest.parents(),
-                            payload.newX(), payload.newY()
-                    );
+                    QuestDefinition newDef = quest.withPosition(payload.newX(), payload.newY());
                     QuestManager.LOADED_QUESTS.put(payload.questId(), newDef);
 
-                    QuestSyncPayload syncPacket = new QuestSyncPayload(
-                            newDef.id(), newDef.title(), newDef.category(), newDef.taskType(),
-                            newDef.target(), newDef.requiredAmount(),
-                            ItemUtils.toCommandString(newDef.icon(), context.server().getRegistryManager()),
-                            newDef.reward(),
-                            newDef.rewardType(), newDef.rewardAmount(), newDef.parents(),
-                            payload.newX(), payload.newY()
-                    );
+                    QuestSyncPayload syncPacket = new QuestSyncPayload(newDef, context.server().getRegistryManager());
 
                     for (ServerPlayerEntity onlinePlayer : context.server().getPlayerManager().getPlayerList()) {
                         ServerPlayNetworking.send(onlinePlayer, syncPacket);
@@ -103,20 +93,10 @@ public class ServerNetworkHandler {
         ServerPlayNetworking.registerGlobalReceiver(SaveQuestPayload.ID, (payload, context) -> context.server().execute(() -> {
             if (!context.server().getPlayerManager().isOperator(context.player().getPlayerConfigEntry())) return;
 
-            QuestDefinition quest = new QuestDefinition(
-                    payload.questId(), payload.title(), payload.category(), payload.taskType(), payload.target(),
-                    payload.requiredAmount(), ItemUtils.fromCommandString(payload.iconId(), context.server().getRegistryManager()),
-                    payload.reward(), payload.rewardType(),
-                    payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
-            );
+            QuestDefinition quest = payload.toDefinition(context.server().getRegistryManager());
 
             if (QuestManager.saveQuest(quest, context.server().getRegistryManager())) {
-                QuestSyncPayload syncPacket = new QuestSyncPayload(
-                        payload.questId(), payload.title(), payload.category(), payload.taskType(),
-                        payload.target(), payload.requiredAmount(), payload.iconId(), payload.reward(),
-                        payload.rewardType(), payload.rewardAmount(), payload.parents(),
-                        payload.displayX(), payload.displayY()
-                );
+                QuestSyncPayload syncPacket = new QuestSyncPayload(quest, context.server().getRegistryManager());
                 context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));
             }
         }));
@@ -141,12 +121,7 @@ public class ServerNetworkHandler {
                     // Remove it from the parents of quests that has it as a parent
                     QuestManager.LOADED_QUESTS.forEach((id, questDefinition) -> {
                         if (questDefinition.parents().remove(payload.questId()) && QuestManager.saveQuest(questDefinition, context.server().getRegistryManager())) {
-                            QuestSyncPayload syncPacket = new QuestSyncPayload(
-                                    id, questDefinition.title(), questDefinition.category(), questDefinition.taskType(),
-                                    questDefinition.target(), questDefinition.requiredAmount(), ItemUtils.toCommandString(questDefinition.icon(), context.server().getRegistryManager()), questDefinition.reward(),
-                                    questDefinition.rewardType(), questDefinition.rewardAmount(), questDefinition.parents(),
-                                    questDefinition.displayX(), questDefinition.displayY()
-                            );
+                            QuestSyncPayload syncPacket = new QuestSyncPayload(questDefinition, context.server().getRegistryManager());
                             context.server().getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, syncPacket));
                         }
                     });
@@ -290,9 +265,7 @@ public class ServerNetworkHandler {
                     }
                 }
                 for (QuestDefinition quest : questsToUpdate) {
-                    QuestDefinition updatedQuest = new QuestDefinition(quest.id(), quest.title(), categoryNew,
-                            quest.taskType(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
-                            quest.rewardType(), quest.rewardAmount(), quest.parents(), quest.displayX(), quest.displayY());
+                    QuestDefinition updatedQuest = quest.withCategory(categoryNew);
                     QuestManager.LOADED_QUESTS.put(quest.id(), updatedQuest);
                 }
 

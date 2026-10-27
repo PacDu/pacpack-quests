@@ -1,6 +1,7 @@
 package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.QuestTask;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.client.PacPackQuestsClient;
@@ -61,7 +62,7 @@ public class EditQuestScreen extends Screen {
     private TaskType currentTaskType = TaskType.MINE_BLOCK;
     private RewardType currentRewardType = RewardType.ITEM;
 
-    private String initialReward = "";
+    private String selectedCommandDescription = "";
     private String errorMessage = null;
     private List<String> selectedParents = new ArrayList<>();
     private QuestDefinition duplicatedQuest = null;
@@ -99,7 +100,6 @@ public class EditQuestScreen extends Screen {
         String initialReqAmt = "1";
         String initialRewAmt = "1";
         String initialParents = "";
-        this.initialReward = "";
 
         // 1. Load data from memory if we are editing a quest
         if ((questId != null && PacPackQuestsClient.CLIENT_DEFINITIONS.containsKey(questId)) || duplicatedQuest != null) {
@@ -114,10 +114,8 @@ public class EditQuestScreen extends Screen {
             // Only update these variables if they are empty (to avoid overwriting SelectionScreen callbacks)
             if (this.selectedIcon == null || this.selectedIcon.equals("minecraft:stone")) this.selectedIcon = ItemUtils.toCommandString(def.icon());
             if (this.selectedTarget == null || this.selectedTarget.equals("minecraft:stone")) this.selectedTarget = def.target();
-            if (this.selectedReward == null || this.selectedReward.equals("minecraft:diamond")) {
-                this.selectedReward = def.reward();
-                this.initialReward = def.reward();
-            }
+            if (this.selectedReward == null || this.selectedReward.equals("minecraft:diamond")) this.selectedReward = def.reward();
+            if (this.selectedCommandDescription.isEmpty()) this.selectedCommandDescription = def.commandDescription();
 
             initialReqAmt = String.valueOf(def.requiredAmount());
             initialRewAmt = String.valueOf(def.rewardAmount());
@@ -135,7 +133,7 @@ public class EditQuestScreen extends Screen {
 
         // ROW 1: Title & Parents
         this.titleField = new TextFieldWidget(this.textRenderer, col1, y, fieldWidth, fieldHeight, Text.translatable("form.pacpack-quests.title"));
-        this.titleField.setMaxLength(64);
+        this.titleField.setMaxLength(96);
         this.titleField.setText(initialTitle);
         this.titleField.setPlaceholder(Text.translatable("form.pacpack-quests.title_placeholder").formatted(Formatting.DARK_GRAY));
         this.addDrawableChild(this.titleField);
@@ -194,9 +192,9 @@ public class EditQuestScreen extends Screen {
 
         this.rewardButton = ButtonWidget.builder(Text.literal(""), button -> {
             if (currentRewardType == RewardType.COMMAND) {
-                String previousCommand = this.initialReward.equals(this.selectedReward) ? this.initialReward : this.selectedReward;
-                this.client.setScreen(new EditCommandScreen(this, previousCommand, result -> {
-                    this.selectedReward = result;
+                this.client.setScreen(new EditCommandScreen(this, this.selectedReward, this.selectedCommandDescription, (cmd, desc) -> {
+                    this.selectedReward = cmd;
+                    this.selectedCommandDescription = desc;
                     updateRewardButtonMessage();
                 }));
             } else {
@@ -444,11 +442,18 @@ public class EditQuestScreen extends Screen {
             }
         }
 
+        java.util.Map<String, String> properties = new java.util.HashMap<>();
+        QuestDefinition existingDef = this.questId != null ? PacPackQuestsClient.CLIENT_DEFINITIONS.get(this.questId) : this.duplicatedQuest;
+        if (existingDef != null && existingDef.properties() != null) {
+            properties.putAll(existingDef.properties());
+        }
+
         SaveQuestPayload payload = new SaveQuestPayload(
                 finalId, this.titleField.getText().trim(), this.category,
-                this.currentTaskType, this.selectedTarget, reqAmt,
-                this.selectedIcon, finalRewardStr,
-                this.currentRewardType, rewAmt, parentsList, this.gridX, this.gridY
+                this.selectedIcon, this.gridX, this.gridY, parentsList,
+                properties,
+                List.of(new QuestTask(this.currentTaskType, this.selectedTarget, reqAmt)),
+                List.of(QuestDefinition.createReward(this.currentRewardType, finalRewardStr, rewAmt, this.selectedCommandDescription))
         );
 
         ClientPlayNetworking.send(payload);

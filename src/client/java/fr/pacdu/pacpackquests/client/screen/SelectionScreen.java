@@ -93,6 +93,7 @@ public class SelectionScreen extends Screen {
         // 1. Search Box
         int searchWidth = 160;
         this.searchBox = new TextFieldWidget(this.textRenderer, (this.width - searchWidth) / 2, 20, searchWidth, 20, Text.empty());
+        this.searchBox.setMaxLength(128);
         this.searchBox.setPlaceholder(Text.translatable("gui.pacpack-quests.search").formatted(Formatting.DARK_GRAY));
         this.searchBox.setChangedListener(this::updateSearch);
         this.addDrawableChild(this.searchBox);

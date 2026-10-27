@@ -10,6 +10,8 @@
   "error.pacpack-quests.self_parent": "Une quête ne peut pas être son propre parent !",
   "error.pacpack-quests.unknown_parent": "Un ou plusieurs IDs parents n'existent pas !",
 
+  "form.pacpack-quests.command": "Commande",
+  "form.pacpack-quests.command_description": "Description de la commande",
   "form.pacpack-quests.icon": "Icône",
   "form.pacpack-quests.parents": "Quêtes Parentes",
   "form.pacpack-quests.quest_id": "Identifiant Unique",
@@ -51,7 +53,7 @@
   "gui.pacpack-quests.mine_block": "Miner",
   "gui.pacpack-quests.obtain_item": "Obtenir",
   "gui.pacpack-quests.open_loot_chest": "Ouvrir",
-  "gui.pacpack-quests.progress": "Avancement",
+  "gui.pacpack-quests.progress": "Progression",
   "gui.pacpack-quests.quest_menu": "Menu des Quêtes",
   "gui.pacpack-quests.ready_to_claim": "Prêt à être récupéré !",
   "gui.pacpack-quests.reward": "Récompense",

@@ -67,21 +67,7 @@ public class PacPackQuests implements ModInitializer {
 				boolean finished = state.isFinished(playerId, quest.id());
 				boolean claimed = state.isClaimed(playerId, quest.id());
 
-				ServerPlayNetworking.send(player, new QuestSyncPayload(
-						quest.id(),
-						quest.title(),
-						quest.category(),
-						quest.taskType(),
-						quest.target(),
-						quest.requiredAmount(),
-						ItemUtils.toCommandString(quest.icon(), server.getRegistryManager()),
-						quest.reward(),
-						quest.rewardType(),
-						quest.rewardAmount(),
-						quest.parents(),
-						quest.displayX(),
-						quest.displayY()
-				));
+				ServerPlayNetworking.send(player, new QuestSyncPayload(quest, server.getRegistryManager()));
 
 				ServerPlayNetworking.send(player, new QuestProgressPayload(quest.id(), progress, finished, claimed));
 			}

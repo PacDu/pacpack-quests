@@ -3,14 +3,13 @@ package fr.pacdu.pacpackquests.data;
 import com.google.gson.*;
 import fr.pacdu.pacpackquests.PacPackQuests;
 import fr.pacdu.pacpackquests.QuestDefinition;
+import fr.pacdu.pacpackquests.QuestTask;
 import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
-import fr.pacdu.pacpackquests.network.QuestSyncPayload;
+import fr.pacdu.pacpackquests.reward.*;
 import fr.pacdu.pacpackquests.util.ItemUtils;
 import fr.pacdu.pacpackquests.util.PathSecurity;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryWrapper;
@@ -32,7 +31,7 @@ public class QuestManager {
     public static final Map<String, QuestDefinition> LOADED_QUESTS = new HashMap<>();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final List<String> QUEST_DEFINITION_REQUIRED_LIST = Arrays.asList(
-            "title", "taskType", "target", "requiredAmount", "icon", "rewardType", "reward", "rewardAmount", "displayX", "displayY"
+            "title", "icon", "displayX", "displayY", "tasks", "rewards"
     );
 
     public static void loadQuests(MinecraftServer server) {
@@ -89,25 +88,52 @@ public class QuestManager {
 
         JsonObject json = new JsonObject();
         json.addProperty("title", quest.title());
-        json.addProperty("taskType", quest.taskType().toString());
-        json.addProperty("target", quest.target());
-        json.addProperty("requiredAmount", quest.requiredAmount());
         json.addProperty("icon", ItemUtils.toCommandString(quest.icon(), registries));
-        json.addProperty("rewardType", quest.rewardType().toString());
-
-        switch (quest.rewardType()) {
-            case XP -> json.addProperty("reward", "xp");
-            case LEVEL -> json.addProperty("reward", "level");
-            case ITEM, COMMAND -> json.addProperty("reward", quest.reward());
-        }
-        json.addProperty("rewardAmount", quest.rewardAmount());
+        json.addProperty("displayX", quest.displayX());
+        json.addProperty("displayY", quest.displayY());
 
         if (quest.parents() != null && !quest.parents().isEmpty()) {
             json.add("parents", GSON.toJsonTree(quest.parents()));
         }
 
-        json.addProperty("displayX", quest.displayX());
-        json.addProperty("displayY", quest.displayY());
+        if (quest.properties() != null && !quest.properties().isEmpty()) {
+            json.add("properties", GSON.toJsonTree(quest.properties()));
+        }
+
+        // Tasks array
+        JsonArray tasksArray = new JsonArray();
+        for (QuestTask task : quest.tasks()) {
+            JsonObject taskObj = new JsonObject();
+            taskObj.addProperty("type", task.type().name());
+            taskObj.addProperty("target", task.target());
+            taskObj.addProperty("requiredAmount", task.requiredAmount());
+            tasksArray.add(taskObj);
+        }
+        json.add("tasks", tasksArray);
+
+        // Rewards array
+        JsonArray rewardsArray = new JsonArray();
+        for (QuestReward reward : quest.rewards()) {
+            JsonObject rewObj = new JsonObject();
+            rewObj.addProperty("type", reward.type().name());
+            switch (reward) {
+                case ItemReward ir -> {
+                    rewObj.addProperty("target", ir.target());
+                    rewObj.addProperty("amount", ir.amount());
+                }
+                case CommandReward cr -> {
+                    rewObj.addProperty("command", cr.command());
+                    if (cr.description() != null && !cr.description().isBlank()) {
+                        rewObj.addProperty("description", cr.description());
+                    }
+                    rewObj.addProperty("amount", cr.amount());
+                }
+                case XpReward xr -> rewObj.addProperty("amount", xr.amount());
+                case LevelReward lr -> rewObj.addProperty("amount", lr.amount());
+            }
+            rewardsArray.add(rewObj);
+        }
+        json.add("rewards", rewardsArray);
 
         try {
             Files.writeString(questFile, GSON.toJson(json));
@@ -124,6 +150,7 @@ public class QuestManager {
 
         StringBuilder errorMessage = new StringBuilder();
 
+        // Check required properties
         for (String e : QUEST_DEFINITION_REQUIRED_LIST) {
             if (!json.has(e)) {
                 errorMessage.append("Variable \"").append(e).append("\" is missing in the quest ").append(questId).append(".");
@@ -138,37 +165,11 @@ public class QuestManager {
         if (lastSlash == -1) errorMessage.append(" The quest must be in a category (a subfolder),");
         String category = lastSlash == -1 ? "error" : filePath.substring(0, lastSlash);
 
-        TaskType taskType = TaskType.isValid(json.get("taskType").getAsString()) ? TaskType.valueOf(json.get("taskType").getAsString()) : null;
-        if (taskType == null) errorMessage.append(" The task type \"").append(json.get("taskType").getAsString()).append("\" does not exist,");
-
-        String target = json.get("target").getAsString();
-        String rawTarget = target.startsWith("#") ? target.substring(1) : target;
-        if (rawTarget.contains("[")) rawTarget = rawTarget.substring(0, rawTarget.indexOf('['));
-        if (Identifier.tryParse(rawTarget) == null) errorMessage.append(" The target ").append(json.get("target")).append(" is not a valid target,");
-
-        int requiredAmount = json.get("requiredAmount").getAsInt();
-        if (requiredAmount <= 0) errorMessage.append(" The required amount must be greater than 0,");
-
         ItemStack icon = ItemUtils.fromCommandString(json.get("icon").getAsString(), registries);
         if (Objects.equals(icon, ItemStack.EMPTY)) errorMessage.append(" The icon ").append(json.get("icon")).append(" does not exist,");
 
-        RewardType rewardType = RewardType.isValid(json.get("rewardType").getAsString()) ? RewardType.valueOf(json.get("rewardType").getAsString()) : null;
-        if (rewardType == null) errorMessage.append(" The reward type \"").append(json.get("rewardType")).append("\" does not exist,");
-
-        String rewardStr = json.get("reward").getAsString();
-        String rawReward = rewardStr.contains("[") ? rewardStr.substring(0, rewardStr.indexOf('[')) : rewardStr;
-        if (rawReward.startsWith("#")) {
-            Identifier tagId = Identifier.tryParse(rawReward.substring(1));
-            if (tagId == null) errorMessage.append(" The reward tag ").append(json.get("reward")).append(" is invalid,");
-        } else if (rewardType == RewardType.ITEM) {
-            Identifier rewardId = Identifier.tryParse(rawReward);
-            if (rewardId == null || !Registries.ITEM.containsId(rewardId)) {
-                errorMessage.append(" The reward ").append(json.get("reward")).append(" does not exist,");
-            }
-        }
-
-        int rewardAmount = json.get("rewardAmount").getAsInt();
-        if (rewardAmount <= 0) errorMessage.append(" The reward amount must be greater than 0,");
+        int displayX = json.get("displayX").getAsInt();
+        int displayY = json.get("displayY").getAsInt();
 
         // Parse optional parents array
         List<String> parents = new ArrayList<>();
@@ -182,8 +183,88 @@ public class QuestManager {
             }
         }
 
-        int displayX = json.get("displayX").getAsInt();
-        int displayY = json.get("displayY").getAsInt();
+        // Parse optional properties map
+        Map<String, String> properties = new HashMap<>();
+        if (json.has("properties") && json.get("properties").isJsonObject()) {
+            JsonObject propObj = json.getAsJsonObject("properties");
+            for (Map.Entry<String, JsonElement> entry : propObj.entrySet()) {
+                if (entry.getValue().isJsonPrimitive()) {
+                    properties.put(entry.getKey(), entry.getValue().getAsString());
+                }
+            }
+        }
+
+        // Parse tasks array
+        List<QuestTask> tasks = new ArrayList<>();
+        if (json.get("tasks").isJsonArray()) {
+            JsonArray tasksArr = json.getAsJsonArray("tasks");
+            for (JsonElement tElem : tasksArr) {
+                if (tElem.isJsonObject()) {
+                    JsonObject tObj = tElem.getAsJsonObject();
+                    TaskType tType = tObj.has("type") && TaskType.isValid(tObj.get("type").getAsString()) ? TaskType.valueOf(tObj.get("type").getAsString()) : null;
+                    if (tType == null) errorMessage.append(" Unknown task type: ").append(tObj.get("type")).append(",");
+
+                    String tTarget = tObj.has("target") ? tObj.get("target").getAsString() : "";
+                    String rawTarget = tTarget.startsWith("#") ? tTarget.substring(1) : tTarget;
+                    if (rawTarget.contains("[")) rawTarget = rawTarget.substring(0, rawTarget.indexOf('['));
+                    if (Identifier.tryParse(rawTarget) == null) errorMessage.append(" The target ").append(tTarget).append(" is not a valid target,");
+
+                    int tAmt = tObj.has("requiredAmount") ? tObj.get("requiredAmount").getAsInt() : 0;
+                    if (tAmt <= 0) errorMessage.append(" Task requiredAmount must be greater than 0,");
+
+                    tasks.add(new QuestTask(tType != null ? tType : TaskType.MINE_BLOCK, tTarget, tAmt));
+                }
+            }
+        }
+        if (tasks.isEmpty()) {
+            errorMessage.append(" Quest must have at least one task in 'tasks',");
+        }
+
+        // Parse rewards array
+        List<QuestReward> rewards = new ArrayList<>();
+        if (json.get("rewards").isJsonArray()) {
+            JsonArray rewsArr = json.getAsJsonArray("rewards");
+            for (JsonElement rElem : rewsArr) {
+                if (rElem.isJsonObject()) {
+                    JsonObject rObj = rElem.getAsJsonObject();
+                    RewardType rType = rObj.has("type") && RewardType.isValid(rObj.get("type").getAsString()) ? RewardType.valueOf(rObj.get("type").getAsString()) : null;
+                    if (rType == null) {
+                        errorMessage.append(" Unknown reward type: ").append(rObj.get("type")).append(",");
+                        continue;
+                    }
+
+                    int rAmt = rObj.has("amount") ? rObj.get("amount").getAsInt() : 0;
+                    if (rAmt <= 0) errorMessage.append(" Reward amount must be greater than 0,");
+
+                    switch (rType) {
+                        case ITEM -> {
+                            String target = rObj.has("target") ? rObj.get("target").getAsString() : "";
+                            String rawReward = target.contains("[") ? target.substring(0, target.indexOf('[')) : target;
+                            if (rawReward.startsWith("#")) {
+                                Identifier tagId = Identifier.tryParse(rawReward.substring(1));
+                                if (tagId == null) errorMessage.append(" The reward tag ").append(target).append(" is invalid,");
+                            } else {
+                                Identifier rewardId = Identifier.tryParse(rawReward);
+                                if (rewardId == null || !Registries.ITEM.containsId(rewardId)) {
+                                    errorMessage.append(" The reward ").append(target).append(" does not exist,");
+                                }
+                            }
+                            rewards.add(new ItemReward(target, rAmt));
+                        }
+                        case XP -> rewards.add(new XpReward(rAmt));
+                        case LEVEL -> rewards.add(new LevelReward(rAmt));
+                        case COMMAND -> {
+                            String cmd = rObj.has("command") ? rObj.get("command").getAsString() : "";
+                            String desc = rObj.has("description") ? rObj.get("description").getAsString() : "";
+                            rewards.add(new CommandReward(cmd, desc, rAmt));
+                        }
+                    }
+                }
+            }
+        }
+        if (rewards.isEmpty()) {
+            errorMessage.append(" Quest must have at least one reward in 'rewards',");
+        }
 
         if (!errorMessage.isEmpty()) {
             errorMessage.deleteCharAt(0).deleteCharAt(errorMessage.length() - 1).insert(0, "There are errors in the json file of quest \"" + questId + "\" : ");
@@ -192,8 +273,7 @@ public class QuestManager {
         }
 
         QuestDefinition quest = new QuestDefinition(
-                questId, title, category, taskType, target, requiredAmount, icon,
-                rewardStr, rewardType, rewardAmount, parents, displayX, displayY
+                questId, title, category, icon, displayX, displayY, parents, properties, tasks, rewards
         );
 
         LOADED_QUESTS.put(questId, quest);

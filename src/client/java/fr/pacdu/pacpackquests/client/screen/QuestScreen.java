@@ -1,7 +1,6 @@
 package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
-import fr.pacdu.pacpackquests.RewardType;
 import fr.pacdu.pacpackquests.TaskType;
 import fr.pacdu.pacpackquests.network.*;
 import fr.pacdu.pacpackquests.client.util.TranslationUtils;
@@ -18,16 +17,15 @@ import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.resource.language.I18n;
 import net.minecraft.command.DefaultPermissions;
 import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.*;
 
@@ -50,7 +48,17 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	private QuestDefinition duplicatedQuest = null;
 	private final ScrollbarWidget categoryScrollbar = new ScrollbarWidget(0, 0, 6, 0, 25, true);
 
-	record QuestNode(String id, String title, int displayX, int displayY, int x, int y, TaskType taskType, String target, int requiredAmount, ItemStack icon, String reward, RewardType rewardType, int rewardAmount, List<String> parents, boolean isLocked) implements GridNode {}
+	record QuestNode(QuestDefinition definition, int x, int y, boolean isLocked) implements GridNode {
+		public String id() { return definition.id(); }
+		public String title() { return definition.title(); }
+		public int displayX() { return definition.displayX(); }
+		public int displayY() { return definition.displayY(); }
+		public ItemStack icon() { return definition.icon(); }
+		public List<String> parents() { return definition.parents(); }
+		public TaskType taskType() { return definition.taskType(); }
+		public String target() { return definition.target(); }
+		public int requiredAmount() { return definition.requiredAmount(); }
+	}
 	record GridPos(int x, int y) {}
 
 	public QuestScreen() {
@@ -142,11 +150,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					}
 				}
 
-				questList.add(new QuestNode(
-						quest.id(), quest.title(), quest.displayX(), quest.displayY(), localX, localY,
-						quest.taskType(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
-						quest.rewardType(), quest.rewardAmount(), quest.parents(), locked
-				));
+				questList.add(new QuestNode(quest, localX, localY, locked));
 			}
 		}
 
@@ -316,11 +320,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		if (duplicatedQuest != null) {
 			int localX = canvasOffsetX + (duplicatedQuest.displayX() * gridSpacing);
 			int localY = canvasOffsetY + (duplicatedQuest.displayY() * gridSpacing);
-			nodeBeingDragged = new QuestNode(duplicatedQuest.id(), duplicatedQuest.title(), duplicatedQuest.displayX(),
-					duplicatedQuest.displayY(), localX, localY, duplicatedQuest.taskType(),
-					duplicatedQuest.target(), duplicatedQuest.requiredAmount(), duplicatedQuest.icon(), duplicatedQuest.reward(), duplicatedQuest.rewardType(),
-					duplicatedQuest.rewardAmount(), duplicatedQuest.parents(), false
-			);
+			nodeBeingDragged = new QuestNode(duplicatedQuest, localX, localY, false);
 		}
 
 		// --- DRAW DRAGGED NODE AT CURSOR ---
@@ -346,12 +346,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		if (nodeBeingDragged != null) {
 			// Temporarily replace X/Y with mouse coordinates for rendering
-			QuestNode movingNode = new QuestNode(
-					nodeBeingDragged.id(), nodeBeingDragged.title(), nodeBeingDragged.displayX(), nodeBeingDragged.displayY(),
-					(int) localMouseX - 12, (int) localMouseY - 12, nodeBeingDragged.taskType(), nodeBeingDragged.target(),
-					nodeBeingDragged.requiredAmount(), nodeBeingDragged.icon(), nodeBeingDragged.reward(), nodeBeingDragged.rewardType(),
-					nodeBeingDragged.rewardAmount(), nodeBeingDragged.parents(), nodeBeingDragged.isLocked()
-			);
+			QuestNode movingNode = new QuestNode(nodeBeingDragged.definition(), (int) localMouseX - 12, (int) localMouseY - 12, nodeBeingDragged.isLocked());
 			renderNode(context, movingNode, localMouseX, localMouseY, false);
 		}
 
@@ -429,7 +424,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			// Task target (e.g., Craft: Shield)
 			tooltip.add(Text.translatable("gui.pacpack-quests." + quest.taskType().toString().toLowerCase())
 					.append(": ")
-					.append(Text.literal(TranslationUtils.getTranslatedName(quest.target(), TaskType.getRegistryType(quest.taskType))))
+					.append(Text.literal(TranslationUtils.getTranslatedName(quest.target(), TaskType.getRegistryType(quest.taskType()))))
 					.formatted(Formatting.GRAY));
 
 			// Progress (e.g., Progress: 0 / 1)
@@ -440,7 +435,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		// 3. Reward
 		MutableText rewardLabel = Text.translatable("gui.pacpack-quests.reward").append(": ").formatted(Formatting.GRAY);
-		tooltip.add(rewardLabel.append(TranslationUtils.getRewardText(quest.rewardType(), quest.reward(), quest.rewardAmount(), claimed)));
+		tooltip.add(rewardLabel.append(TranslationUtils.getRewardText(quest.definition().primaryReward(), claimed)));
 
 		context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
 	}
@@ -577,11 +572,20 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			} else if (click.button() == 2) { // Middle Click: Duplicate Quest
 				for (QuestNode quest : questList) {
 					if (isHoveringNode(quest.x(), quest.y(), localMouseX, localMouseY)) {
-						long suffix = (System.currentTimeMillis() / 1000) % 10000;
-						String newId = quest.id() + "_copy_" + suffix;
-						QuestDefinition newQuest = new QuestDefinition(newId, quest.title + " Copy",
-								selectedCategory, quest.taskType, quest.target, quest.requiredAmount, quest.icon,
-								quest.reward, quest.rewardType, quest.rewardAmount, quest.parents, quest.displayX, quest.displayY);
+						int suffix = 0;
+						Pattern pattern = Pattern.compile("(" + quest.id() + "_copy)([0-9]+)$");
+						for (QuestDefinition def : CLIENT_DEFINITIONS.values()) {
+							Matcher matcher = pattern.matcher(def.id());
+							if (matcher.find()) {
+								suffix = Math.max(suffix, Integer.parseInt(matcher.group(2)));
+							}
+						}
+						String newId = quest.id() + "_copy" + (suffix + 1);
+
+						QuestDefinition originalDef = CLIENT_DEFINITIONS.get(quest.id());
+						if (originalDef == null) return true;
+						QuestDefinition newQuest = originalDef.withIdAndTitle(newId, originalDef.title() + " Copy");
+
 						draggedQuestId = newQuest.id();
 						duplicatedQuest = newQuest;
 						return true;
@@ -703,14 +707,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				else if (finalX != oldDef.displayX() || finalY != oldDef.displayY()) {
 					ClientPlayNetworking.send(new MoveQuestPayload(draggedQuestId, finalX, finalY));
 
-					QuestDefinition newDef = new QuestDefinition(
-							oldDef.id(), oldDef.title(), oldDef.category(),
-							oldDef.taskType(), oldDef.target(), oldDef.requiredAmount(),
-							oldDef.icon(), oldDef.reward(), oldDef.rewardType(),
-							oldDef.rewardAmount(), oldDef.parents(),
-							finalX, finalY
-					);
-
+					QuestDefinition newDef = oldDef.withPosition(finalX, finalY);
 					CLIENT_DEFINITIONS.put(draggedQuestId, newDef);
 				}
 			}

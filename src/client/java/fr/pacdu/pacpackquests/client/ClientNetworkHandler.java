@@ -20,12 +20,7 @@ public class ClientNetworkHandler {
         ClientPlayNetworking.registerGlobalReceiver(QuestSyncPayload.ID, (payload, context) -> context.client().execute(() -> {
             var client = context.client();
             var registries = client.world != null ? client.world.getRegistryManager() : (client.getServer() != null ? client.getServer().getRegistryManager() : null);
-            ItemStack icon = ItemUtils.fromCommandString(payload.iconId(), registries);
-            QuestDefinition def = new QuestDefinition(
-                    payload.questId(), payload.title(), payload.category(), payload.type(), payload.target(),
-                    payload.requiredAmount(), icon, payload.reward(), payload.rewardType(),
-                    payload.rewardAmount(), payload.parents(), payload.displayX(), payload.displayY()
-            );
+            QuestDefinition def = payload.toDefinition(registries);
             PacPackQuestsClient.CLIENT_DEFINITIONS.put(payload.questId(), def);
 
             for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
@@ -104,9 +99,7 @@ public class ClientNetworkHandler {
         ClientPlayNetworking.registerGlobalReceiver(EditCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
             for (QuestDefinition quest : PacPackQuestsClient.CLIENT_DEFINITIONS.values()) {
                 if (quest.category().equals(payload.categoryOld())) {
-                    QuestDefinition updatedQuest = new QuestDefinition(quest.id(), quest.title(), payload.categoryNew(),
-                            quest.taskType(), quest.target(), quest.requiredAmount(), quest.icon(), quest.reward(),
-                            quest.rewardType(), quest.rewardAmount(), quest.parents(), quest.displayX(), quest.displayY());
+                    QuestDefinition updatedQuest = quest.withCategory(payload.categoryNew());
                     PacPackQuestsClient.CLIENT_DEFINITIONS.put(quest.id(), updatedQuest);
                 }
             }
