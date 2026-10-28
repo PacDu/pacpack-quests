@@ -22,8 +22,9 @@ public abstract class AbstractQuestGridScreen extends Screen {
     protected final int canvasOffsetX = 20;
     protected final int canvasOffsetY = 20;
 
-    protected final int tabWidth = 70;
+    protected int tabWidth = 90;
     protected final int tabHeight = 20;
+    protected final int categoryNameMaxChars = 32;
 
     // Grid size for edit mode constraints
     protected int maxGridColumns = 20;
@@ -52,10 +53,15 @@ public abstract class AbstractQuestGridScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        // Exact layout from the original QuestScreen to ensure perfect match
-        windowWidth = this.width - 2 * this.tabWidth;
+
+        int maxTabWidth = this.textRenderer.getWidth("M".repeat(categoryNameMaxChars)) + 12;
+        int winWidthPx = (this.client != null && this.client.getWindow() != null) ? this.client.getWindow().getFramebufferWidth() : 1920;
+        float factor = Math.clamp((winWidthPx - 854f) / (1920f - 854f), 0.0f, 1.0f);
+        this.tabWidth = Math.round(90 + factor * (maxTabWidth - 90));
+
+        startX = this.tabWidth + 40;
+        windowWidth = Math.max(100, this.width - startX - 30);
         windowHeight = this.height - 80;
-        startX = (this.width - windowWidth) / 2 + 40;
         startY = (this.height - windowHeight) / 2 - 10;
     }
 

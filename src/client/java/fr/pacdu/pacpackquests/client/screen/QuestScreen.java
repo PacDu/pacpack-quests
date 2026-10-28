@@ -35,8 +35,6 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	private final List<QuestNode> questList = new ArrayList<>();
 
 	private static String selectedCategory = DEFAULT_CATEGORY_NAME;
-	private final int tabWidth = 70;
-	private final int tabHeight = 20;
 
 	private ButtonWidget claimAllButton;
 	private TextFieldWidget inlineCategoryField;
@@ -115,7 +113,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 				super.write(PathSecurity.formatStringToValidPath(text));
 			}
 		};
-		this.inlineCategoryField.setMaxLength(10);
+		this.inlineCategoryField.setMaxLength(categoryNameMaxChars);
 		this.inlineCategoryField.setVisible(false);
 		this.addDrawableChild(this.inlineCategoryField);
 
@@ -196,6 +194,9 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		
 		context.getMatrices().translate(0f, (float)-scrollAmount);
 
+		String hoveredTruncatedCategory = null;
+		int maxTextWidth = tabWidth - 8;
+
 		int catIndex = 0;
 		for (String category : CLIENT_CATEGORIES) {
 			if (currentTabY + tabHeight < startY + categMarginTop + scrollAmount || currentTabY > startY + windowHeight + scrollAmount - categMarginBottom) {
@@ -212,9 +213,24 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			// The original tab is not drawn if it is being moved
 			if (!category.equals(draggedCategory)) {
 				if (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget)) {
-					boolean isSelected = category.equals(selectedCategory) || isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, (int)(mouseY + scrollAmount));
+					boolean isTabHovered = isHovering(tabX, currentTabY, tabWidth, tabHeight, mouseX, (int)(mouseY + scrollAmount));
+					boolean isSelected = category.equals(selectedCategory) || isTabHovered;
 					context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
-					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(category.toUpperCase()), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
+
+					String fullCategory = category.toUpperCase();
+					String displayCategory = fullCategory;
+					boolean isTruncated = false;
+					if (this.textRenderer.getWidth(fullCategory) > maxTextWidth) {
+						int ellipsisWidth = this.textRenderer.getWidth("...");
+						displayCategory = this.textRenderer.trimToWidth(fullCategory, maxTextWidth - ellipsisWidth) + "...";
+						isTruncated = true;
+					}
+
+					context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(displayCategory), tabX + tabWidth / 2, currentTabY + 6, isSelected ? 0xFFFFFFFF : 0xFFAAAAAA);
+
+					if (isTabHovered && isTruncated) {
+						hoveredTruncatedCategory = fullCategory;
+					}
 				}
 
 				if (isEditMode) {
@@ -244,7 +260,13 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		if (isEditMode && draggedCategory != null) {
 			int floatY = (int)(mouseY + scrollAmount) - tabHeight / 2;
 			context.fill(tabX, floatY, tabX + tabWidth, floatY + tabHeight, 0xFF888888);
-			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(draggedCategory.toUpperCase()), tabX + tabWidth / 2, floatY + 6, 0xFFFFFFFF);
+			String fullCategory = draggedCategory.toUpperCase();
+			String displayCategory = fullCategory;
+			if (this.textRenderer.getWidth(fullCategory) > maxTextWidth) {
+				int ellipsisWidth = this.textRenderer.getWidth("...");
+				displayCategory = this.textRenderer.trimToWidth(fullCategory, maxTextWidth - ellipsisWidth) + "...";
+			}
+			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(displayCategory), tabX + tabWidth / 2, floatY + 6, 0xFFFFFFFF);
 		}
 
 		// --- ADD CATEGORY BUTTON / INLINE FIELD ---
@@ -376,6 +398,10 @@ public class QuestScreen extends AbstractQuestGridScreen {
 			editTooltip.add(Text.translatable("gui.pacpack-quests.right_click").formatted(Formatting.GRAY).append(" ").append(Text.translatable("gui.pacpack-quests.to_add").formatted(Formatting.WHITE)));
 			context.drawTooltip(this.textRenderer, editTooltip, mouseX, mouseY);
 		}
+
+		if (hoveredTruncatedCategory != null && draggedQuestId == null && draggedCategory == null) {
+			context.drawTooltip(this.textRenderer, Text.literal(hoveredTruncatedCategory), mouseX, mouseY);
+		}
 	}
 
 	private void renderNode(DrawContext context, QuestNode quest, double localMouseX, double localMouseY, boolean checkHover) {
@@ -506,7 +532,9 @@ public class QuestScreen extends AbstractQuestGridScreen {
 						if (mouseX >= editBtnX && mouseX <= editBtnX + 10 && adjustedMouseY >= editBtnY && adjustedMouseY <= editBtnY + 10) {
 							categoryEditTarget = category;
 							this.inlineCategoryField.setX(tabX);
+							this.inlineCategoryField.setWidth(tabWidth);
 							this.inlineCategoryField.setY((int)(currentTabY - scrollAmount));
+							this.inlineCategoryField.setText(category);
 							this.inlineCategoryField.setVisible(true);
 							this.setFocused(this.inlineCategoryField);
 							this.inlineCategoryField.setFocused(true);
@@ -537,7 +565,9 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					if (mouseX >= tabX && mouseX <= tabX + tabWidth && adjustedMouseY >= currentTabY && adjustedMouseY <= currentTabY + tabHeight) {
 						this.categoryEditTarget = null;
 						this.inlineCategoryField.setX(tabX);
+						this.inlineCategoryField.setWidth(tabWidth);
 						this.inlineCategoryField.setY((int)(currentTabY - scrollAmount));
+						this.inlineCategoryField.setText("");
 						this.inlineCategoryField.setVisible(true);
 						this.setFocused(this.inlineCategoryField);
 						this.inlineCategoryField.setFocused(true);

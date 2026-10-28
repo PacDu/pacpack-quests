@@ -153,7 +153,17 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         int tabX = startX - tabWidth;
         int tabY = startY + 20;
         context.fill(tabX, tabY, tabX + tabWidth, tabY + tabHeight, 0xFF666666);
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(currentCategory.toUpperCase()), tabX + tabWidth / 2, tabY + 6, 0xFFFFFFFF);
+
+        String fullCat = currentCategory.toUpperCase();
+        int maxTextWidth = tabWidth - 8;
+        String displayCat = fullCat;
+        boolean isTruncated = false;
+        if (this.textRenderer.getWidth(fullCat) > maxTextWidth) {
+            int ellipsisWidth = this.textRenderer.getWidth("...");
+            displayCat = this.textRenderer.trimToWidth(fullCat, maxTextWidth - ellipsisWidth) + "...";
+            isTruncated = true;
+        }
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(displayCat), tabX + tabWidth / 2, tabY + 6, 0xFFFFFFFF);
 
         context.enableScissor(startX, startY, startX + windowWidth, startY + windowHeight);
         context.getMatrices().pushMatrix();
@@ -210,6 +220,8 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
                 tooltip.add(Text.translatable("gui.pacpack-quests.cannot_select_child").formatted(Formatting.RED));
             }
             context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
+        } else if (isTruncated && mouseX >= tabX && mouseX <= tabX + tabWidth && mouseY >= tabY && mouseY <= tabY + tabHeight) {
+            context.drawTooltip(this.textRenderer, Text.literal(fullCat), mouseX, mouseY);
         }
     }
 
