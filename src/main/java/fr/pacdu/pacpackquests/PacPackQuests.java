@@ -5,13 +5,11 @@ import fr.pacdu.pacpackquests.data.QuestEventHandler;
 import fr.pacdu.pacpackquests.data.QuestManager;
 import fr.pacdu.pacpackquests.data.QuestState;
 import fr.pacdu.pacpackquests.network.*;
-import fr.pacdu.pacpackquests.util.ItemUtils;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +19,7 @@ import java.util.UUID;
 public class PacPackQuests implements ModInitializer {
 
 	public static final String MOD_ID = "pacpackquests";
+	public static final String DEFAULT_CATEGORY_NAME = "main";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
 	@Override

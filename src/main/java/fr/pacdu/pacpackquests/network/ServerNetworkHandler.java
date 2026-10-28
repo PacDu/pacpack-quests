@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
+
 public class ServerNetworkHandler {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -175,9 +177,11 @@ public class ServerNetworkHandler {
                         for (File file : files) file.delete();
                     }
                     dir.delete();
-                    ModConfig.categoryOrder.remove(categoryToDelete);
-                    ModConfig.save();
                 }
+
+                ModConfig.categoryOrder.remove(categoryToDelete);
+                if (ModConfig.categoryOrder.isEmpty()) ModConfig.categoryOrder.add(DEFAULT_CATEGORY_NAME);
+                ModConfig.save();
 
                 QuestManager.LOADED_QUESTS.values().removeIf(quest -> quest.category().equals(categoryToDelete));
                 DeleteCategoryPayload syncPayload = new DeleteCategoryPayload(categoryToDelete);

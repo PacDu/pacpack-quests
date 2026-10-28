@@ -27,13 +27,14 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
 import static fr.pacdu.pacpackquests.client.PacPackQuestsClient.*;
 
 public class QuestScreen extends AbstractQuestGridScreen {
 
 	private final List<QuestNode> questList = new ArrayList<>();
 
-	private static String selectedCategory = "main";
+	private static String selectedCategory = DEFAULT_CATEGORY_NAME;
 	private final int tabWidth = 70;
 	private final int tabHeight = 20;
 
@@ -121,7 +122,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		this.categoryEditTarget = null;
 
 		if (CLIENT_CATEGORIES.isEmpty()) {
-			CLIENT_CATEGORIES.add("main");
+			CLIENT_CATEGORIES.add(DEFAULT_CATEGORY_NAME);
 		}
 
 		// Update selectedCategory if the previous one no longer exists
@@ -909,7 +910,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	public void removeCategory(String categoryName) {
 		// If the deleted category was the one open, we switch to another one
 		if (selectedCategory.equals(categoryName)) {
-			selectedCategory = CLIENT_CATEGORIES.isEmpty() ? "main" : CLIENT_CATEGORIES.getFirst();
+			selectedCategory = CLIENT_CATEGORIES.isEmpty() ? DEFAULT_CATEGORY_NAME : CLIENT_CATEGORIES.getFirst();
 			refreshQuests();
 			resetCamera();
 		}

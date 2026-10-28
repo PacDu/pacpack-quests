@@ -12,6 +12,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import static fr.pacdu.pacpackquests.PacPackQuests.DEFAULT_CATEGORY_NAME;
+
 public class ModConfig {
     // We use GsonBuilder to make the JSON file readable (pretty printing)
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -51,6 +53,7 @@ public class ModConfig {
 
     public static void save() {
         try {
+            if (categoryOrder.isEmpty()) categoryOrder.add(DEFAULT_CATEGORY_NAME);
             Files.createDirectories(CONFIG_FILE.getParent());
             JsonObject json = new JsonObject();
             json.add("categoryOrder", GSON.toJsonTree(categoryOrder));
