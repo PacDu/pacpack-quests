@@ -27,6 +27,7 @@ public class PacPackQuests implements ModInitializer {
 		LOGGER.info("Initializing PacPack Quests...");
 		ModConfig.load();
 		ServerLifecycleEvents.SERVER_STARTING.register(QuestManager::loadQuests);
+		ServerLifecycleEvents.SERVER_STOPPING.register(server -> ModConfig.save());
 
 		// Register S2C payloads
 		PayloadTypeRegistry.playS2C().register(QuestSyncPayload.ID, QuestSyncPayload.CODEC);

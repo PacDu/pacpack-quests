@@ -80,6 +80,7 @@ public class ClientNetworkHandler {
         ClientPlayNetworking.registerGlobalReceiver(DeleteCategoryPayload.ID, (payload, context) -> context.client().execute(() -> {
             PacPackQuestsClient.CLIENT_DEFINITIONS.entrySet().removeIf(entry -> entry.getValue().category().equals(payload.category()));
             PacPackQuestsClient.CLIENT_CATEGORIES.remove(payload.category());
+            ModConfig.cameraPositions.remove(payload.category());
 
             if (context.client().currentScreen instanceof QuestScreen questScreen) {
                 questScreen.removeCategory(payload.category());
@@ -102,6 +103,11 @@ public class ClientNetworkHandler {
                     QuestDefinition updatedQuest = quest.withCategory(payload.categoryNew());
                     PacPackQuestsClient.CLIENT_DEFINITIONS.put(quest.id(), updatedQuest);
                 }
+            }
+
+            ModConfig.CameraState state = ModConfig.cameraPositions.remove(payload.categoryOld());
+            if (state != null) {
+                ModConfig.cameraPositions.put(payload.categoryNew(), state);
             }
 
             if (context.client().currentScreen instanceof QuestScreen questScreen) {

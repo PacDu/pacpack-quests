@@ -154,7 +154,7 @@ public class ParentSelectionScreen extends AbstractQuestGridScreen {
         int tabY = startY + 20;
         context.fill(tabX, tabY, tabX + tabWidth, tabY + tabHeight, 0xFF666666);
 
-        String fullCat = currentCategory.toUpperCase();
+        String fullCat = currentCategory.toUpperCase().replace("_", " ");
         int maxTextWidth = tabWidth - 8;
         String displayCat = fullCat;
         boolean isTruncated = false;

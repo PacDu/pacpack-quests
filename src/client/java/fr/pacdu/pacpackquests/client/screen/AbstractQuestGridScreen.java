@@ -15,9 +15,9 @@ public abstract class AbstractQuestGridScreen extends Screen {
     protected static final int PADDING = 16;
     
     // --- Camera & Canvas System ---
-    protected static double panX = 0;
-    protected static double panY = 0;
-    protected static float zoom = 1.0f;
+    protected double panX = 0;
+    protected double panY = 0;
+    protected float zoom = 1.0f;
     protected final int gridSpacing = 48;
     protected final int canvasOffsetX = 20;
     protected final int canvasOffsetY = 20;

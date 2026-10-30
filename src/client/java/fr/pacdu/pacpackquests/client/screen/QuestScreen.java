@@ -2,6 +2,7 @@ package fr.pacdu.pacpackquests.client.screen;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.TaskType;
+import fr.pacdu.pacpackquests.config.ModConfig;
 import fr.pacdu.pacpackquests.network.*;
 import fr.pacdu.pacpackquests.client.util.TranslationUtils;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -130,10 +131,35 @@ public class QuestScreen extends AbstractQuestGridScreen {
 
 		refreshQuests();
 		if (!this.cameraInitialized) {
-			resetCamera();
+			restoreCameraState(selectedCategory);
 			this.cameraInitialized = true;
 		} else {
 			clampPanning();
+		}
+	}
+
+	@Override
+	public void removed() {
+		saveCurrentCameraState();
+		super.removed();
+	}
+
+	private void saveCurrentCameraState() {
+		if (selectedCategory != null) {
+			ModConfig.cameraPositions.put(selectedCategory, new ModConfig.CameraState(this.panX, this.panY, this.zoom));
+		}
+	}
+
+	private void restoreCameraState(String category) {
+		ModConfig.CameraState state = ModConfig.cameraPositions.get(category);
+		if (state != null) {
+			this.panX = state.panX();
+			this.panY = state.panY();
+			this.zoom = state.zoom();
+			clampPanning();
+		} else {
+			resetCamera();
+			saveCurrentCameraState();
 		}
 	}
 
@@ -217,7 +243,7 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					boolean isSelected = category.equals(selectedCategory) || isTabHovered;
 					context.fill(tabX, currentTabY, tabX + tabWidth, currentTabY + tabHeight, isSelected ? 0xFF666666 : 0xFF333333);
 
-					String fullCategory = category.toUpperCase();
+					String fullCategory = category.toUpperCase().replace("_", " ");
 					String displayCategory = fullCategory;
 					boolean isTruncated = false;
 					if (this.textRenderer.getWidth(fullCategory) > maxTextWidth) {
@@ -546,9 +572,10 @@ public class QuestScreen extends AbstractQuestGridScreen {
 					if (mouseX >= tabX && mouseX <= tabX + tabWidth && adjustedMouseY >= currentTabY && adjustedMouseY <= currentTabY + tabHeight
 							&& (!this.inlineCategoryField.isVisible() || !category.equals(this.categoryEditTarget))) {
 						if (!category.equals(selectedCategory)) {
+							saveCurrentCameraState();
 							selectedCategory = category;
 							refreshQuests();
-							resetCamera();
+							restoreCameraState(selectedCategory);
 						}
 						if (isEditMode) {
 							categoryClickTarget = category;
@@ -932,17 +959,20 @@ public class QuestScreen extends AbstractQuestGridScreen {
 		if (!CLIENT_CATEGORIES.contains(categoryName)) {
 			CLIENT_CATEGORIES.add(categoryName);
 		}
+		saveCurrentCameraState();
 		selectedCategory = categoryName;
 		refreshQuests();
 		resetCamera();
+		saveCurrentCameraState();
 	}
 
 	public void removeCategory(String categoryName) {
+		ModConfig.cameraPositions.remove(categoryName);
 		// If the deleted category was the one open, we switch to another one
 		if (selectedCategory.equals(categoryName)) {
 			selectedCategory = CLIENT_CATEGORIES.isEmpty() ? DEFAULT_CATEGORY_NAME : CLIENT_CATEGORIES.getFirst();
 			refreshQuests();
-			resetCamera();
+			restoreCameraState(selectedCategory);
 		}
 		this.refreshUI();
 	}
@@ -950,6 +980,11 @@ public class QuestScreen extends AbstractQuestGridScreen {
 	public void renameCategory(String oldName, String newName) {
 		int index = CLIENT_CATEGORIES.indexOf(oldName);
 		if (index >= 0) {
+			ModConfig.CameraState state = ModConfig.cameraPositions.remove(oldName);
+			if (state != null) {
+				ModConfig.cameraPositions.put(newName, state);
+			}
+
 			List<String> newCategories = new ArrayList<>();
 
 			for (int i = 0; i < CLIENT_CATEGORIES.size(); i++) {

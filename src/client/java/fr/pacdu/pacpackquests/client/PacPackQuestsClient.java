@@ -2,7 +2,9 @@ package fr.pacdu.pacpackquests.client;
 
 import fr.pacdu.pacpackquests.QuestDefinition;
 import fr.pacdu.pacpackquests.client.screen.QuestScreen;
+import fr.pacdu.pacpackquests.config.ModConfig;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -32,7 +34,10 @@ public class PacPackQuestsClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> ModConfig.load());
+
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			ModConfig.save();
             CLIENT_DEFINITIONS.clear();
             CLIENT_PROGRESS.clear();
             CLIENT_FINISHED.clear();
@@ -41,6 +46,8 @@ public class PacPackQuestsClient implements ClientModInitializer {
             SERVER_STRUCTURES.clear();
             SERVER_LOOT_TABLES.clear();
         });
+
+		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ModConfig.save());
 
 		openQuestMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 				"key.pacpack-quests.open-quest-menu",
